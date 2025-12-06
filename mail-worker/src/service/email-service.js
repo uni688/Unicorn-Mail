@@ -29,6 +29,7 @@ const emailService = {
 		size = Number(size);
 		emailId = Number(emailId);
 		timeSort = Number(timeSort);
+		accountId = Number(accountId);
 
 		if (size > 30) {
 			size = 30;
@@ -109,6 +110,14 @@ const emailService = {
 			const atts = attsList.filter(attsRow => attsRow.emailId === emailRow.emailId);
 			emailRow.attList = atts;
 		});
+
+		if (!latestEmail) {
+			latestEmail = {
+				emailId: 0,
+				accountId: accountId,
+				userId: userId,
+			}
+		}
 
 		return { list, total: totalRow.total, latestEmail };
 	},
@@ -671,6 +680,11 @@ const emailService = {
 	async physicsDeleteByAccountId(c, accountId) {
 		await attService.removeByAccountId(c, accountId);
 		await orm(c).delete(email).where(eq(email.accountId, accountId)).run();
+	},
+
+	async read(c, params, userId) {
+		const { emailIds } = params;
+		await orm(c).update(email).set({ unread: emailConst.unread.READ }).where(and(eq(email.userId, userId), inArray(email.emailId, emailIds)));
 	}
 };
 

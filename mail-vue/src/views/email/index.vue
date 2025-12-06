@@ -7,6 +7,8 @@
                :star-add="starAdd"
                :star-cancel="starCancel"
                :time-sort="params.timeSort"
+               :email-read="emailRead"
+               :show-unread="true"
                actionLeft="4px"
                @jump="jumpContent"
   >
@@ -25,9 +27,9 @@ import {useAccountStore} from "@/store/account.js";
 import {useEmailStore} from "@/store/email.js";
 import {useSettingStore} from "@/store/setting.js";
 import emailScroll from "@/components/email-scroll/index.vue"
-import {emailList, emailDelete, emailLatest} from "@/request/email.js";
+import {emailList, emailDelete, emailLatest, emailRead} from "@/request/email.js";
 import {starAdd, starCancel} from "@/request/star.js";
-import {defineOptions, onMounted, reactive, ref, watch} from "vue";
+import {defineOptions, h, onMounted, reactive, ref, watch} from "vue";
 import {sleep} from "@/utils/time-utils.js";
 import router from "@/router/index.js";
 import {Icon} from "@iconify/vue";
@@ -62,6 +64,7 @@ function changeTimeSort() {
 function jumpContent(email) {
   emailStore.contentData.email = email
   emailStore.contentData.delType = 'logic'
+  emailStore.contentData.showUnread = true
   emailStore.contentData.showStar = true
   emailStore.contentData.showReply = true
   router.push('/message')
@@ -71,20 +74,46 @@ const existIds = new Set();
 
 async function latest() {
   while (true) {
-    const latestId = scroll.value.latestEmail?.emailId || 0
+    const latestId = scroll.value.latestEmail?.emailId
 
     if (!scroll.value.firstLoad && settingStore.settings.autoRefreshTime) {
       try {
         const accountId = accountStore.currentAccountId
         const curTimeSort = params.timeSort
-        const list = await emailLatest(latestId, accountId)
+        let list = []
+
+        //确保发起请求时最后一个邮件是当前账号的,或者
+        if (accountId === scroll.value.latestEmail?.accountId) {
+          list = await emailLatest(latestId, accountId);
+        }
+
+        //确保请求回来后，账号没有切换，时间排序没有改变
         if (accountId === accountStore.currentAccountId && params.timeSort === curTimeSort) {
           if (list.length > 0) {
 
-            list.forEach(email => {
-              existIds.add(email.emailId)
-              scroll.value.addItem(email)
-            })
+            for (let email of list) {
+
+              if (!existIds.has(email.emailId)) {
+
+                existIds.add(email.emailId)
+                scroll.value.addItem(email)
+
+                if (innerWidth > 1367) {
+                  ElNotification({
+                    type: 'primary',
+                    message: `<div style="cursor: pointer;"><div style="overflow: hidden;white-space: nowrap;text-overflow: ellipsis; font-weight: bold;font-size: 16px;margin-bottom: 5px;">${email.name}</div><div style="color: teal;">${email.subject}</div></div>`,
+                    position: 'bottom-right',
+                    dangerouslyUseHTMLString: true,
+                    onClick: () => {
+                      jumpContent(email);
+                    }
+                  })
+                }
+
+                await sleep(50)
+              }
+
+            }
 
           }
 
