@@ -48,6 +48,17 @@
           </el-tooltip>
         </div>
       </div>
+      <div class="item">
+        <div>{{$t('githubBinding')}}</div>
+        <div>
+          <el-button v-if="!userStore.user.oauthId" type="primary" @click="bindGithub">
+            <el-avatar src="https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png" :size="18" style="margin-right: 10px" />{{$t('bindGithub')}}
+          </el-button>
+          <el-button v-else type="danger" @click="unbindGithub">
+            <el-avatar src="https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png" :size="18" style="margin-right: 10px" />{{$t('unbindGithub')}}
+          </el-button>
+        </div>
+      </div>
     </div>
     <div class="del-email" v-perm="'my:delete'">
       <div class="title">{{$t('deleteUser')}}</div>
@@ -69,21 +80,24 @@
 </template>
 <script setup>
 import {reactive, ref, defineOptions, onMounted} from 'vue'
-import {resetPassword, userDelete, setEmailAutoDeleteDays} from "@/request/my.js";
-import {useUserStore} from "@/store/user.js";
-import router from "@/router/index.js";
-import {accountSetName} from "@/request/account.js";
-import {useAccountStore} from "@/store/account.js";
+import {resetPassword, userDelete, setEmailAutoDeleteDays, unbindGithub} from "@/request/my.js"
+import {useUserStore} from "@/store/user.js"
+import router from "@/router/index.js"
+import {accountSetName} from "@/request/account.js"
+import {useAccountStore} from "@/store/account.js"
 import {useI18n} from "vue-i18n";
+import {useSettingStore} from "@/store/setting.js";
 
 const { t } = useI18n()
 const accountStore = useAccountStore()
 const userStore = useUserStore();
+const settingStore = useSettingStore();
 const setPwdLoading = ref(false)
 const setNameShow = ref(false)
 const accountName = ref(null)
 const emailAutoDeleteDays = ref(30)
 const setEmailAutoDeleteLoading = ref(false)
+const unbindGithubLoading = ref(false)
 
 defineOptions({
   name: 'setting'
@@ -164,6 +178,36 @@ const handleSetEmailAutoDeleteDays = () => {
     setEmailAutoDeleteLoading.value = false
   }).catch(() => {
     setEmailAutoDeleteLoading.value = false
+  })
+}
+
+// 绑定GitHub账号
+const bindGithub = () => {
+  const clientId = settingStore.settings.githubClientId
+  const redirectUri = encodeURIComponent(settingStore.settings.githubCallbackUrl)
+  window.location.href =
+      `https://github.com/login/oauth/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=code&scope=user:email`
+}
+
+// 解绑GitHub账号
+const unbindGithub = () => {
+  ElMessageBox.confirm(t('unbindGithubConfirm'), {
+    confirmButtonText: t('confirm'),
+    cancelButtonText: t('cancel'),
+    type: 'warning'
+  }).then(() => {
+    unbindGithubLoading.value = true
+    unbindGithub().then(() => {
+      ElMessage({
+        message: t('unbindSuccessMsg'),
+        type: 'success',
+        plain: true,
+      })
+      userStore.user.oauthId = null
+      unbindGithubLoading.value = false
+    }).catch(() => {
+      unbindGithubLoading.value = false
+    })
   })
 }
 

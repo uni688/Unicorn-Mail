@@ -13,6 +13,10 @@ export function userDelete() {
 }
 
 export function setEmailAutoDeleteDays(days) {
-    return http.put('/my/setEmailAutoDeleteDays', {emailAutoDeleteDays: days})
+    return http.put('/my/setEmailAutoDeleteDays', { days })
+}
+
+export function unbindGithub() {
+    return http.delete('/oauth/unbindGithub')
 }
 

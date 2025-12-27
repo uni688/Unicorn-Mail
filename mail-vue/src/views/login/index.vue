@@ -47,6 +47,9 @@
           <el-button class="btn" v-if="settingStore.settings.linuxdoSwitch"  style="margin-top: 10px"  @click="linuxDoLogin">
             <el-avatar src="/image/linuxdo.webp" :size="18" style="margin-right: 10px" />LinuxDo
           </el-button>
+          <el-button class="btn" v-if="settingStore.settings.githubSwitch"  style="margin-top: 10px"  @click="githubLogin">
+            <el-avatar src="https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png" :size="18" style="margin-right: 10px" />GitHub
+          </el-button>
         </div>
         <div v-show="show !== 'login'">
           <el-input class="email-input" v-model="registerForm.email" type="text" :placeholder="$t('emailAccount')"
@@ -96,6 +99,9 @@
           </el-button>
           <el-button v-if="settingStore.settings.linuxdoSwitch" class="btn" style="margin-top: 10px"  @click="linuxDoLogin">
             <el-avatar src="/image/linuxdo.webp" :size="18" style="margin-right: 10px" />LinuxDo
+          </el-button>
+          <el-button v-if="settingStore.settings.githubSwitch" class="btn" style="margin-top: 10px"  @click="githubLogin">
+            <el-avatar src="https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png" :size="18" style="margin-right: 10px" />GitHub
           </el-button>
         </div>
         <template v-if="settingStore.settings.register === 0">
@@ -161,7 +167,7 @@ import {cvtR2Url} from "@/utils/convert.js";
 import {loginUserInfo} from "@/request/my.js";
 import {permsToRouter} from "@/perm/perm.js";
 import {useI18n} from "vue-i18n";
-import {oauthBindUser, oauthLinuxDoLogin} from "@/request/ouath.js";
+import {oauthBindUser, oauthLinuxDoLogin, oauthGithubLogin} from "@/request/ouath.js";
 
 const {t} = useI18n();
 const accountStore = useAccountStore();
@@ -257,18 +263,31 @@ function linuxDoLogin() {
       `https://connect.linux.do/oauth2/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=code&scope=openid+profile+email`
 }
 
-linuxDoGetUser();
+function githubLogin() {
+  const clientId = settingStore.settings.githubClientId
+  const redirectUri = encodeURIComponent(settingStore.settings.githubCallbackUrl)
+  window.location.href =
+      `https://github.com/login/oauth/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=code&scope=user:email`
+}
 
-async function linuxDoGetUser() {
+oauthGetUser();
 
+async function oauthGetUser() {
   const params = new URLSearchParams(window.location.search)
   const code = params.get('code')
+  const provider = params.get('provider') || 'linuxdo'
 
   if (code) {
-
     oauthLoading.value = true
-    oauthLinuxDoLogin(code).then(data => {
-
+    let oauthLoginPromise
+    
+    if (provider === 'github') {
+      oauthLoginPromise = oauthGithubLogin(code)
+    } else {
+      oauthLoginPromise = oauthLinuxDoLogin(code)
+    }
+    
+    oauthLoginPromise.then(data => {
       bindForm.oauthUserId = data.userInfo.oauthUserId;
 
       if (!data.token) {
