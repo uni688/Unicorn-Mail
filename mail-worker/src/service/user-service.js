@@ -25,10 +25,15 @@ const userService = {
 
 		const userRow = await userService.selectById(c, userId);
 
-		const [account, roleRow, permKeys] = await Promise.all([
+		const [account, roleRow, permKeys, oauthInfo] = await Promise.all([
 			accountService.selectByEmailIncludeDel(c, userRow.email),
 			roleService.selectById(c, userRow.type),
-			userRow.email === c.env.admin ? Promise.resolve(['*']) : permService.userPermKeys(c, userId)
+			userRow.email === c.env.admin ? Promise.resolve(['*']) : permService.userPermKeys(c, userId),
+			// 获取用户的GitHub绑定信息
+			orm(c).select()
+				.from(oauth)
+				.where(eq(oauth.userId, userId))
+				.get()
 		]);
 
 		const user = {};
@@ -40,6 +45,16 @@ const userService = {
 		user.name = account.name;
 		user.permKeys = permKeys;
 		user.role = roleRow
+		// 添加GitHub绑定信息
+		if (oauthInfo) {
+			user.oauthId = oauthInfo.oauthId;
+			user.githubUsername = oauthInfo.username;
+			user.githubAvatar = oauthInfo.avatar;
+		} else {
+			user.oauthId = null;
+			user.githubUsername = null;
+			user.githubAvatar = null;
+		}
 
 		if (c.env.admin === userRow.email) {
 			user.role = constant.ADMIN_ROLE

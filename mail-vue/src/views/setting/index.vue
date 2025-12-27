@@ -51,11 +51,13 @@
       <div class="item">
         <div>{{$t('githubBinding')}}</div>
         <div>
-          <el-button v-if="!userStore.user.oauthId" type="primary" @click="bindGithub">
+          <div v-if="userStore.user.oauthId" class="github-info" @click="showUnbindConfirm">
+            <el-avatar :src="userStore.user.githubAvatar" :size="30" style="margin-right: 10px" />
+            <span class="github-username">{{ userStore.user.githubUsername }}</span>
+            <el-icon class="unbind-icon"><el-icon-mingcute:delete-fill /></el-icon>
+          </div>
+          <el-button v-else type="primary" @click="bindGithub">
             <el-avatar src="https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png" :size="18" style="margin-right: 10px" />{{$t('bindGithub')}}
-          </el-button>
-          <el-button v-else type="danger" @click="handleUnbindGithub" :loading="unbindGithubLoading">
-            <el-avatar src="https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png" :size="18" style="margin-right: 10px" />{{$t('unbindGithub')}}
           </el-button>
         </div>
       </div>
@@ -98,6 +100,17 @@ const accountName = ref(null)
 const emailAutoDeleteDays = ref(30)
 const setEmailAutoDeleteLoading = ref(false)
 const unbindGithubLoading = ref(false)
+
+// 显示解绑确认对话框
+const showUnbindConfirm = () => {
+  ElMessageBox.confirm(t('unbindGithubConfirm'), {
+    confirmButtonText: t('confirm'),
+    cancelButtonText: t('cancel'),
+    type: 'warning'
+  }).then(() => {
+    handleUnbindGithub()
+  })
+}
 
 defineOptions({
   name: 'setting'

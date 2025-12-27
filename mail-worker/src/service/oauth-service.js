@@ -89,7 +89,32 @@ const oauthService = {
 		const userRow = await userService.selectByIdIncludeDel(c, oauthRow.userId);
 
 		if (!userRow) {
-			return { userInfo: oauthRow, token: null }
+			// 自动生成默认邮箱地址
+			const defaultEmail = `${userInfo.username}@cnmailcn.dpdns.org`;
+			// 检查邮箱是否已存在
+			let isEmailAvailable = false;
+			let emailSuggestions = [];
+			
+			try {
+				const existingUser = await userService.selectByEmailIncludeDel(c, defaultEmail);
+				isEmailAvailable = !existingUser;
+			} catch (error) {
+				isEmailAvailable = false;
+			}
+			
+			if (!isEmailAvailable) {
+				// 生成3-5个备选邮箱建议
+				emailSuggestions = await this.generateEmailSuggestions(c, userInfo.username);
+			}
+			
+			// 返回OAuth信息和邮箱建议
+			return {
+				userInfo: oauthRow,
+				token: null,
+				defaultEmail,
+				isEmailAvailable,
+				emailSuggestions
+			};
 		}
 
 		const JwtToken = await loginService.login(c, { email: userRow.email, password: null }, true);
@@ -163,7 +188,32 @@ const oauthService = {
 		}
 
 		if (!userRow) {
-			return { userInfo: oauthRow, token: null }
+			// 自动生成默认邮箱地址
+			const defaultEmail = `${userInfo.username}@cnmailcn.dpdns.org`;
+			// 检查邮箱是否已存在
+			let isEmailAvailable = false;
+			let emailSuggestions = [];
+			
+			try {
+				const existingUser = await userService.selectByEmailIncludeDel(c, defaultEmail);
+				isEmailAvailable = !existingUser;
+			} catch (error) {
+				isEmailAvailable = false;
+			}
+			
+			if (!isEmailAvailable) {
+				// 生成3-5个备选邮箱建议
+				emailSuggestions = await this.generateEmailSuggestions(c, userInfo.username);
+			}
+			
+			// 返回OAuth信息和邮箱建议
+			return {
+				userInfo: oauthRow,
+				token: null,
+				defaultEmail,
+				isEmailAvailable,
+				emailSuggestions
+			};
 		}
 
 		const JwtToken = await loginService.login(c, { email: userRow.email, password: null }, true);
@@ -180,6 +230,58 @@ const oauthService = {
 			return await orm(c).update(oauth).set(userInfo).where(eq(oauth.oauthUserId, userInfo.oauthUserId)).returning().get();
 		}
 
+	},
+	
+	// 生成邮箱建议
+	async generateEmailSuggestions(c, username) {
+		const suggestions = [];
+		const domains = ['cnmailcn.dpdns.org'];
+		const suffixes = ['a', 'b', 'c', '2025', '123'];
+		
+		// 尝试生成5个建议
+		for (let i = 0; i < suffixes.length; i++) {
+			const suffix = suffixes[i];
+			const email = `${username}${suffix}@${domains[0]}`;
+			
+			try {
+				const existingUser = await userService.selectByEmailIncludeDel(c, email);
+				if (!existingUser) {
+					suggestions.push(email);
+				}
+			} catch (error) {
+				// 邮箱不存在，可用
+				suggestions.push(email);
+			}
+			
+			// 生成3个建议后停止
+			if (suggestions.length >= 3) {
+				break;
+			}
+		}
+		
+		// 如果生成的建议不足3个，再尝试其他组合
+		if (suggestions.length < 3) {
+			for (let i = 0; i < 10; i++) {
+				const randomSuffix = Math.floor(Math.random() * 1000);
+				const email = `${username}${randomSuffix}@${domains[0]}`;
+				
+				try {
+					const existingUser = await userService.selectByEmailIncludeDel(c, email);
+					if (!existingUser) {
+						suggestions.push(email);
+					}
+				} catch (error) {
+					// 邮箱不存在，可用
+					suggestions.push(email);
+				}
+				
+				if (suggestions.length >= 3) {
+					break;
+				}
+			}
+		}
+		
+		return suggestions;
 	},
 
 	async getById(c, oauthUserId) {

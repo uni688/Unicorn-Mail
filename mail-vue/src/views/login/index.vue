@@ -134,6 +134,23 @@
             </div>
           </template>
         </el-input>
+        
+        <!-- 邮箱建议显示区域 -->
+        <div v-if="showEmailSuggestions && emailSuggestions.length > 0" class="email-suggestions">
+          <div class="suggestion-title">{{ $t('emailSuggestions') }}</div>
+          <div class="suggestion-list">
+            <div 
+              v-for="(suggestion, index) in emailSuggestions" 
+              :key="index"
+              :class="['suggestion-item', { 'recommended': index === 0 }]"
+              @click="selectEmailSuggestion(suggestion)"
+            >
+              <span class="suggestion-email">{{ suggestion }}</span>
+              <span v-if="index === 0" class="recommended-tag">{{ $t('recommended') }}</span>
+            </div>
+          </div>
+        </div>
+        
         <el-input v-if="settingStore.settings.regKey === 0" v-model="bindForm.code" :placeholder="$t('regKey')"
                   type="text" autocomplete="off"/>
         <el-input v-if="settingStore.settings.regKey === 2" v-model="bindForm.code"
@@ -182,6 +199,11 @@ const bindForm = reactive({
   oauthUserId: '',
   code: ''
 })
+
+// 邮箱建议相关状态
+const emailSuggestions = ref([]);
+const showEmailSuggestions = ref(false);
+const recommendedEmail = ref('');
 
 const form = reactive({
   email: '',
@@ -290,6 +312,21 @@ async function oauthGetUser() {
       bindForm.oauthUserId = data.userInfo.oauthUserId;
 
       if (!data.token) {
+        // 设置默认邮箱
+        if (data.defaultEmail) {
+          bindForm.email = data.defaultEmail;
+        }
+        
+        // 处理邮箱建议
+        if (data.emailSuggestions && data.emailSuggestions.length > 0) {
+          emailSuggestions.value = data.emailSuggestions;
+          recommendedEmail.value = data.emailSuggestions[0];
+          showEmailSuggestions.value = true;
+        } else {
+          emailSuggestions.value = [];
+          showEmailSuggestions.value = false;
+        }
+        
         showBindForm.value = true
         oauthLoading.value = false
         ElMessage({
@@ -319,6 +356,20 @@ async function oauthGetUser() {
     const cleanUrl = window.location.origin + window.location.pathname
     window.history.replaceState({}, '', cleanUrl)
   }
+}
+
+// 选择邮箱建议
+function selectEmailSuggestion(email) {
+  // 解析邮箱，获取用户名和域名
+  const [username, domain] = email.split('@');
+  bindForm.email = username;
+  // 设置对应的后缀
+  const domainIndex = domainList.findIndex(d => d === '@' + domain);
+  if (domainIndex !== -1) {
+    suffix.value = domainList[domainIndex];
+  }
+  // 选择后隐藏建议列表
+  showEmailSuggestions.value = false;
 }
 
 function bind() {
@@ -715,10 +766,62 @@ function submitRegister() {
 }
 
 .bind-container {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 15px;
-}
+		display: grid;
+		grid-template-columns: 1fr;
+		gap: 15px;
+	}
+
+	.email-suggestions {
+		background-color: var(--el-bg-color);
+		border: 1px solid var(--el-border-color-light);
+		border-radius: 6px;
+		padding: 10px;
+	}
+
+	.suggestion-title {
+		font-size: 14px;
+		font-weight: bold;
+		margin-bottom: 8px;
+		color: var(--el-text-color-primary);
+	}
+
+	.suggestion-list {
+		display: flex;
+		flex-direction: column;
+		gap: 5px;
+	}
+
+	.suggestion-item {
+		padding: 8px 12px;
+		border-radius: 4px;
+		cursor: pointer;
+		font-size: 14px;
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		transition: all 0.2s;
+	}
+
+	.suggestion-item:hover {
+		background-color: var(--el-color-primary-light-9);
+	}
+
+	.suggestion-item.recommended {
+		background-color: var(--el-color-primary-light-10);
+		border: 1px solid var(--el-color-primary-light-5);
+	}
+
+	.recommended-tag {
+		font-size: 12px;
+		color: var(--el-color-primary);
+		background-color: var(--el-color-primary-light-9);
+		padding: 2px 6px;
+		border-radius: 3px;
+	}
+
+	.suggestion-email {
+		color: var(--el-text-color-primary);
+	}
 
 .setting-icon {
   position: relative;
