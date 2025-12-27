@@ -233,6 +233,57 @@
             </div>
           </div>
 
+          <!-- R2 Storage Setting Card -->
+          <div class="settings-card">
+            <div class="card-title">{{ $t('r2StorageSetting') }}</div>
+            <div class="card-content">
+              <div class="setting-item">
+                <div>
+                  <span>{{ $t('r2MaxSize') }}</span>
+                  <el-tooltip effect="dark" :content="$t('r2MaxSizeDesc')">
+                    <Icon class="warning" icon="fe:warning" width="18" height="18"/>
+                  </el-tooltip>
+                </div>
+                <div>
+                  <el-input-number 
+                    v-model="r2MaxSize" 
+                    @change="r2MaxSizeChange" 
+                    :min="1" 
+                    :max="1000" 
+                    :precision="0" 
+                    style="width: 150px"
+                  >
+                    <template #suffix>
+                      <span>{{ $t('gbUnit') }}</span>
+                    </template>
+                  </el-input-number>
+                </div>
+              </div>
+              <div class="setting-item">
+                <div>
+                  <span>{{ $t('r2FileExpireDays') }}</span>
+                  <el-tooltip effect="dark" :content="$t('r2FileExpireDaysDesc')">
+                    <Icon class="warning" icon="fe:warning" width="18" height="18"/>
+                  </el-tooltip>
+                </div>
+                <div>
+                  <el-input-number 
+                    v-model="r2FileExpireDays" 
+                    @change="r2FileExpireDaysChange" 
+                    :min="1" 
+                    :max="365" 
+                    :precision="0" 
+                    style="width: 150px"
+                  >
+                    <template #suffix>
+                      <span>{{ $t('dayUnit') }}</span>
+                    </template>
+                  </el-input-number>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <div class="settings-card">
             <div class="card-title">{{ $t('emailPush') }}</div>
             <div class="card-content">
@@ -788,6 +839,8 @@ let backgroundFile = {}
 const showSetBackground = ref(false)
 let regVerifyCount = ref(1)
 let addVerifyCount = ref(1)
+let r2MaxSize = ref(10)
+let r2FileExpireDays = ref(7)
 let backup = '{}'
 const addS3Show = ref(false)
 const addVerifyCountShow = ref(false)
@@ -866,6 +919,9 @@ function getSettings() {
     resendTokenForm.domain = setting.value.domainList[0]
     loginOpacity.value = setting.value.loginOpacity
     minEmailPrefix.value = setting.value.minEmailPrefix
+    // 初始化R2存储设置，转换为GB和天
+    r2MaxSize.value = Math.round((setting.value.r2MaxSize || 10737418240) / 1073741824)
+    r2FileExpireDays.value = setting.value.r2FileExpireDays || 7
     firstLoading.value = false
     backgroundUrl.value = setting.value.background?.startsWith('http') ? setting.value.background : ''
     editTitle.value = setting.value.title
@@ -876,6 +932,16 @@ function getSettings() {
     resetAddS3Form()
     resetEmailPrefix()
   })
+}
+
+function r2MaxSizeChange() {
+  const form = { r2MaxSize: r2MaxSize.value * 1073741824 }
+  editSetting(form)
+}
+
+function r2FileExpireDaysChange() {
+  const form = { r2FileExpireDays: r2FileExpireDays.value }
+  editSetting(form)
 }
 
 

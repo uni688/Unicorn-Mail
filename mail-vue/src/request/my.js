@@ -12,3 +12,7 @@ export function userDelete() {
     return http.delete('/my/delete')
 }
 
+export function setEmailAutoDeleteDays(days) {
+    return http.put('/my/setEmailAutoDeleteDays', {emailAutoDeleteDays: days})
+}
+

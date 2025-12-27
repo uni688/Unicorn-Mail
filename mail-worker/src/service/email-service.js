@@ -722,6 +722,26 @@ const emailService = {
 			await c.env.db.prepare(`UPDATE email as e SET status = ${emailConst.status.NOONE} WHERE status = ${emailConst.status.SAVING} AND NOT EXISTS (SELECT 1 FROM account WHERE account_id = e.account_id)`).run();
 	},
 
+	async autoDeleteEmails(c) {
+		// 获取所有用户的邮件自动删除设置
+		const users = await c.env.db.prepare(
+			'SELECT user_id, email_auto_delete_days FROM user WHERE email_auto_delete_days > 0'
+		).all();
+
+		for (const user of users.results) {
+			const { user_id: userId, email_auto_delete_days: days } = user;
+			
+			// 删除超过设置天数且未星标的邮件
+			await c.env.db.prepare(
+				`DELETE FROM email 
+				 WHERE user_id = ? 
+				 AND create_time < DATETIME('now', ? || ' days') 
+				 AND email_id NOT IN (SELECT email_id FROM star WHERE user_id = ?)
+				 AND is_del = 0`
+			).bind(userId, -days, userId).run();
+		}
+	},
+
 	async batchDelete(c, params) {
 		let { sendName, sendEmail, toEmail, subject, startTime, endTime, type  } = params
 

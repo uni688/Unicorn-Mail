@@ -35,6 +35,7 @@ const userService = {
 		user.userId = userRow.userId;
 		user.sendCount = userRow.sendCount;
 		user.email = userRow.email;
+		user.emailAutoDeleteDays = userRow.emailAutoDeleteDays;
 		user.account = account;
 		user.name = account.name;
 		user.permKeys = permKeys;
@@ -244,6 +245,13 @@ const userService = {
 
 		const { password, userId } = params;
 		await this.resetPassword(c, { password }, userId);
+	},
+
+	async setEmailAutoDeleteDays(c, params, userId) {
+		const { emailAutoDeleteDays } = params;
+		// 限制天数范围为1-30天
+		const days = Math.max(1, Math.min(30, emailAutoDeleteDays));
+		await orm(c).update(user).set({ emailAutoDeleteDays: days }).where(eq(user.userId, userId)).run();
 	},
 
 	async setStatus(c, params) {

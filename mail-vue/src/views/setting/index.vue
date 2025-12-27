@@ -29,6 +29,25 @@
           <el-button type="primary" @click="pwdShow = true">{{$t('changePwdBtn')}}</el-button>
         </div>
       </div>
+      <div class="item">
+        <div>{{$t('emailAutoDelete')}}</div>
+        <div>
+          <el-tooltip effect="dark" :content="$t('emailAutoDeleteDesc')">
+            <el-input-number 
+              v-model="emailAutoDeleteDays" 
+              @change="handleSetEmailAutoDeleteDays" 
+              :min="1" 
+              :max="30" 
+              :precision="0" 
+              style="width: 150px"
+            >
+              <template #suffix>
+                <span>{{ $t('dayUnit') }}</span>
+              </template>
+            </el-input-number>
+          </el-tooltip>
+        </div>
+      </div>
     </div>
     <div class="del-email" v-perm="'my:delete'">
       <div class="title">{{$t('deleteUser')}}</div>
@@ -49,8 +68,8 @@
   </div>
 </template>
 <script setup>
-import {reactive, ref, defineOptions} from 'vue'
-import {resetPassword, userDelete} from "@/request/my.js";
+import {reactive, ref, defineOptions, onMounted} from 'vue'
+import {resetPassword, userDelete, setEmailAutoDeleteDays} from "@/request/my.js";
 import {useUserStore} from "@/store/user.js";
 import router from "@/router/index.js";
 import {accountSetName} from "@/request/account.js";
@@ -63,6 +82,8 @@ const userStore = useUserStore();
 const setPwdLoading = ref(false)
 const setNameShow = ref(false)
 const accountName = ref(null)
+const emailAutoDeleteDays = ref(30)
+const setEmailAutoDeleteLoading = ref(false)
 
 defineOptions({
   name: 'setting'
@@ -130,6 +151,31 @@ const deleteConfirm = () => {
     })
   })
 }
+
+// 设置邮件自动删除天数
+const handleSetEmailAutoDeleteDays = () => {
+  setEmailAutoDeleteLoading.value = true
+  setEmailAutoDeleteDays(emailAutoDeleteDays.value).then(() => {
+    ElMessage({
+      message: t('saveSuccessMsg'),
+      type: 'success',
+      plain: true,
+    })
+    setEmailAutoDeleteLoading.value = false
+  }).catch(() => {
+    setEmailAutoDeleteLoading.value = false
+  })
+}
+
+// 组件挂载时获取用户信息，包括邮件自动删除设置
+onMounted(() => {
+  // 从用户信息中获取邮件自动删除设置
+  if (userStore.user.emailAutoDeleteDays) {
+    emailAutoDeleteDays.value = userStore.user.emailAutoDeleteDays
+  } else {
+    emailAutoDeleteDays.value = 30
+  }
+})
 
 
 function submitPwd() {
