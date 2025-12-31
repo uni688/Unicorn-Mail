@@ -120,20 +120,6 @@ cloud-mail
 └── └── env.release				# 项目配置
 ```
 
-## 赞助
-
-<a href="https://pay.ygyang.uk" >
-<img width="170px" src="./doc/images/support.png" alt="">
-</a>
-
 ## 许可证
 
 本项目采用 [MIT](LICENSE) 许可证	
-
-
-## 交流
-
-[Telegram](https://t.me/cloud_mail_tg)
-
-
-
