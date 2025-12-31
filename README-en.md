@@ -66,7 +66,7 @@
 
 - **File Storage**: [Cloudflare R2](https://developers.cloudflare.com/r2/)
 
-## 目录结构
+## Construction
 
 ```
 cloud-mail
@@ -112,16 +112,6 @@ cloud-mail
 
 ```
 
-## Support
-
-<a href="https://doc.skymail.ink/support.html">
-<img width="170px" src="./doc/images/support.png" alt="">
-</a>
-
 ## License
 
 This project is licensed under the [MIT](LICENSE) license.
-
-## Communication
-
-[Telegram](https://t.me/cloud_mail_tg)
