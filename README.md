@@ -18,7 +18,7 @@
 
 ## 项目展示
 
-- [在线演示](https://mail.ygyang.uk)<br>
+- [在线演示](https://skymail.ink)<br>
 - [部署文档](https://doc.skymail.ink)<br>
 - [界面部署](https://doc.skymail.ink/guide/via-ui.html)
 
