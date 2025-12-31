@@ -15,9 +15,9 @@ database_id = "c181b8e5-5c28-422d-86da-0b163e1b9726"		#d1数据库id
 binding = "kv"			#kv绑定名默认不可修改
 id = "825b607f5c1d4f3e853dc563756b77bc"					#kv数据库id
 
-[[r2_buckets]]
-binding = "r2"			#r2对象存储绑定名默认不可修改
-bucket_name = "cnmailcn"		#r2对象存储桶的名字
+#[[r2_buckets]]
+#binding = "r2"			#r2对象存储绑定名默认不可修改
+#bucket_name = ""		#r2对象存储桶的名字
 
 [assets]
 binding = "assets"		#静态资源绑定名默认不可修改
