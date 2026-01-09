@@ -735,10 +735,10 @@ const emailService = {
 			await c.env.db.prepare(
 				`DELETE FROM email 
 				 WHERE user_id = ? 
-				 AND create_time < DATETIME('now', ? || ' days') 
+				 AND create_time < DATETIME('now', '-' || ? || ' days') 
 				 AND email_id NOT IN (SELECT email_id FROM star WHERE user_id = ?)
 				 AND is_del = 0`
-			).bind(userId, -days, userId).run();
+			).bind(userId, days, userId).run();
 		}
 	},
 
