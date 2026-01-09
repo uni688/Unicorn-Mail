@@ -327,7 +327,7 @@ async function oauthGetUser() {
         showBindForm.value = true
         oauthLoading.value = false
         ElMessage({
-          message: t('pleaseBindEmail'),
+          message: '请先绑定邮箱',
           type: 'warning',
           duration: 4000,
           plain: true,
