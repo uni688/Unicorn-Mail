@@ -947,26 +947,26 @@ function submitRegister() {
 .unicorn::after {
   content: '';
   position: absolute;
-  width: 100%;
-  height: 100%;
-  top: 0;
-  left: -150px;
+  width: 180px;
+  height: 40px;
+  top: 50%;
+  left: -180px;
+  transform: translateY(-50%);
   background: linear-gradient(
     90deg,
-    transparent,
-    rgba(255, 0, 0, 0.4),
-    rgba(255, 127, 0, 0.4),
-    rgba(255, 255, 0, 0.4),
-    rgba(0, 255, 0, 0.4),
-    rgba(0, 0, 255, 0.4),
-    rgba(139, 0, 255, 0.4),
-    transparent
+    transparent 0%,
+    #FF1744 10%,
+    #FF6F00 25%,
+    #FFD600 40%,
+    #00E676 55%,
+    #2979FF 70%,
+    #D500F9 85%,
+    transparent 100%
   );
-  border-radius: 50%;
-  filter: blur(15px);
-  opacity: 0.8;
+  border-radius: 20px;
+  filter: blur(4px);
+  opacity: 0.9;
   z-index: -1;
-  animation: rainbow 3s linear infinite;
 }
 
 </style>
