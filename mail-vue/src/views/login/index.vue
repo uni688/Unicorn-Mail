@@ -602,7 +602,7 @@ function submitRegister() {
     
     // 注册成功后，询问是否绑定GitHub
     if (settingStore.settings.githubSwitch) {
-      ElMessageBox.confirm(t('bindGithubAfterReg'), t('regSuccessMsg'), {
+      ElMessageBox.confirm('是否立即绑定 GitHub？', t('regSuccessMsg'), {
         confirmButtonText: t('confirm'),
         cancelButtonText: t('cancel'),
         type: 'info'
