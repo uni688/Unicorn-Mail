@@ -903,9 +903,13 @@ function submitRegister() {
   }
 }
 
-@keyframes rainbow {
-  0% { filter: hue-rotate(0deg); }
-  100% { filter: hue-rotate(360deg); }
+@keyframes trailFlow {
+  0% {
+    background-position: 0% 50%;
+  }
+  100% {
+    background-position: 200% 50%;
+  }
 }
 
 .x1 {
@@ -947,26 +951,25 @@ function submitRegister() {
 .unicorn::after {
   content: '';
   position: absolute;
-  width: 180px;
-  height: 40px;
-  top: 50%;
-  left: -180px;
+  width: 300px;
+  height: 35px;
+  top: 55%;
+  left: -280px;
   transform: translateY(-50%);
   background: linear-gradient(
     90deg,
-    transparent 0%,
-    #FF1744 10%,
-    #FF6F00 25%,
-    #FFD600 40%,
-    #00E676 55%,
-    #2979FF 70%,
-    #D500F9 85%,
-    transparent 100%
+    #FF0000, #FF7F00, #FFFF00, #00FF00, #0000FF, #4B0082, #9400D3,
+    #FF0000, #FF7F00, #FFFF00, #00FF00, #0000FF, #4B0082, #9400D3
   );
-  border-radius: 20px;
-  filter: blur(4px);
-  opacity: 0.9;
+  background-size: 200% 100%;
+  border-radius: 100px;
+  filter: blur(8px);
+  opacity: 0.8;
   z-index: -1;
+  animation: trailFlow 0.5s linear infinite reverse;
+  /* 只有 Webkit 浏览器支持 mask-image 时需要前缀，Vite 自动处理或手动添加 */
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, black 40%, black 100%);
+  mask-image: linear-gradient(to right, transparent 0%, black 40%, black 100%);
 }
 
 </style>
