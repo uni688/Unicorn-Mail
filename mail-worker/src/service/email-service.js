@@ -373,7 +373,8 @@ const emailService = {
 					const emailDataItem = { ...emailData };
 					emailDataItem.resendEmailId = data.id;
 					emailDataItem.recipient = JSON.stringify(resendEmailList.map(item => ({ address: item, name: '' })));
-					emailDataItem.toEmail = resendEmailList.join(',');
+					// In non-divide mode, all recipients are stored in `recipient`; `toEmail` stores a single primary address for consistency.
+					emailDataItem.toEmail = resendEmailList[0] || '';
 					emailDataItem.toName = '';
 					emailDataList.push(emailDataItem);
 				}
