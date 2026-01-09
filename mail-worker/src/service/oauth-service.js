@@ -90,7 +90,7 @@ const oauthService = {
 
 		if (!userRow) {
 			// 自动生成默认邮箱地址
-			const defaultEmail = `${userInfo.username}@cnmailcn.dpdns.org`;
+			const defaultEmail = `${userInfo.username}@${c.env.domain}`;
 			// 检查邮箱是否已存在
 			let isEmailAvailable = false;
 			let emailSuggestions = [];
