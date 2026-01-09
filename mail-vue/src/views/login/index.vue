@@ -1,11 +1,11 @@
 <template>
   <div id="login-box" :style=" background ? 'background: var(--el-bg-color)' : ''" v-loading="oauthLoading" element-loading-text="登录中...">
     <div id="background-wrap" v-if="!settingStore.settings.background">
-      <div class="x1 cloud"></div>
-      <div class="x2 cloud"></div>
-      <div class="x3 cloud"></div>
-      <div class="x4 cloud"></div>
-      <div class="x5 cloud"></div>
+      <div class="x1 unicorn"></div>
+      <div class="x2 unicorn"></div>
+      <div class="x3 unicorn"></div>
+      <div class="x4 unicorn"></div>
+      <div class="x5 unicorn"></div>
     </div>
     <div v-else :style="background"></div>
     <div class="form-wrapper">
@@ -160,9 +160,6 @@
         </el-button>
       </div>
     </el-dialog>
-    <a class="github" href="https://github.com/maillab/cloud-mail">
-      <Icon icon="mingcute:github-line" color="#1890ff" width="20" height="20" />
-    </a>
   </div>
 </template>
 
@@ -896,7 +893,7 @@ function submitRegister() {
   z-index: 0;
 }
 
-@keyframes animateCloud {
+@keyframes animateUnicorn {
   0% {
     margin-left: -500px;
   }
@@ -906,62 +903,70 @@ function submitRegister() {
   }
 }
 
+@keyframes rainbow {
+  0% { filter: hue-rotate(0deg); }
+  100% { filter: hue-rotate(360deg); }
+}
+
 .x1 {
-  animation: animateCloud 30s linear infinite;
+  animation: animateUnicorn 30s linear infinite;
   transform: scale(0.65);
 }
 
 .x2 {
-  animation: animateCloud 15s linear infinite;
+  animation: animateUnicorn 15s linear infinite;
   transform: scale(0.3);
 }
 
 .x3 {
-  animation: animateCloud 25s linear infinite;
+  animation: animateUnicorn 25s linear infinite;
   transform: scale(0.5);
 }
 
 .x4 {
-  animation: animateCloud 13s linear infinite;
+  animation: animateUnicorn 13s linear infinite;
   transform: scale(0.4);
 }
 
 .x5 {
-  animation: animateCloud 20s linear infinite;
+  animation: animateUnicorn 20s linear infinite;
   transform: scale(0.55);
 }
 
-.cloud {
-  background: linear-gradient(to bottom, #fff 5%, #f1f1f1 100%);
-  border-radius: 100px;
-  box-shadow: 0 8px 5px rgba(0, 0, 0, 0.1);
-  height: 120px;
-  width: 350px;
+.unicorn {
+  background-image: url('/image/unicorn.svg');
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  height: 150px;
+  width: 200px;
   position: relative;
+  filter: drop-shadow(0 0 10px rgba(255, 255, 255, 0.5));
 }
 
-.cloud:after,
-.cloud:before {
-  content: "";
+.unicorn::after {
+  content: '';
   position: absolute;
-  background: #fff;
+  width: 100%;
+  height: 100%;
+  top: 0;
+  left: -150px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 0, 0, 0.4),
+    rgba(255, 127, 0, 0.4),
+    rgba(255, 255, 0, 0.4),
+    rgba(0, 255, 0, 0.4),
+    rgba(0, 0, 255, 0.4),
+    rgba(139, 0, 255, 0.4),
+    transparent
+  );
+  border-radius: 50%;
+  filter: blur(15px);
+  opacity: 0.8;
   z-index: -1;
-}
-
-.cloud:after {
-  border-radius: 100px;
-  height: 100px;
-  left: 50px;
-  top: -50px;
-  width: 100px;
-}
-
-.cloud:before {
-  border-radius: 200px;
-  height: 180px;
-  width: 180px;
-  right: 50px;
-  top: -90px;
+  animation: rainbow 3s linear infinite;
 }
 
 </style>
