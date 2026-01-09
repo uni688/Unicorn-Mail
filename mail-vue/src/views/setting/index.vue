@@ -106,13 +106,8 @@ const unbindGithubLoading = ref(false)
 
 // 显示解绑确认对话框
 const showUnbindConfirm = () => {
-  ElMessageBox.confirm(t('unbindGithubConfirm'), {
-    confirmButtonText: t('confirm'),
-    cancelButtonText: t('cancel'),
-    type: 'warning'
-  }).then(() => {
-    handleUnbindGithub()
-  })
+  // 确认逻辑已在 handleUnbindGithub 中实现，这里直接调用以避免重复弹窗
+  handleUnbindGithub()
 }
 
 defineOptions({
