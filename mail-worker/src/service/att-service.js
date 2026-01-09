@@ -234,7 +234,7 @@ const attService = {
 
 	// 新增安全删除方法
 	async safeDeleteAttachment(c, keyOrKeys, attId) {
-		if (!r2Service.isConfigured) {
+		if (!r2Service.isConfigured()) {
 			console.warn(`R2 未配置，跳过删除 ${Array.isArray(keyOrKeys) ? keyOrKeys.join(',') : keyOrKeys}`);
 			return false;
 		}

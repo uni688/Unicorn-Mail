@@ -106,13 +106,8 @@ const unbindGithubLoading = ref(false)
 
 // 显示解绑确认对话框
 const showUnbindConfirm = () => {
-  ElMessageBox.confirm(t('unbindGithubConfirm'), {
-    confirmButtonText: t('confirm'),
-    cancelButtonText: t('cancel'),
-    type: 'warning'
-  }).then(() => {
-    handleUnbindGithub()
-  })
+  // 确认逻辑已在 handleUnbindGithub 中实现，这里直接调用以避免重复弹窗
+  handleUnbindGithub()
 }
 
 defineOptions({
@@ -207,24 +202,8 @@ const bindGithub = () => {
 
 // 解绑GitHub账号
 const handleUnbindGithub = () => {
-  ElMessageBox.confirm(t('unbindGithubConfirm'), {
-    confirmButtonText: t('confirm'),
-    cancelButtonText: t('cancel'),
-    type: 'warning'
-  }).then(() => {
-    unbindGithubLoading.value = true
-    unbindGithubApi().then(() => {
-      ElMessage({
-        message: t('unbindSuccessMsg'),
-        type: 'success',
-        plain: true,
-      })
-      userStore.user.oauthId = null
-      unbindGithubLoading.value = false
-    }).catch(() => {
-      unbindGithubLoading.value = false
-    })
-  })
+  // Delegate to the shared confirmation logic to avoid duplication
+  showUnbindConfirm()
 }
 
 // 组件挂载时获取用户信息，包括邮件自动删除设置
