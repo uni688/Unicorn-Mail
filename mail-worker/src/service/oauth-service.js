@@ -99,7 +99,9 @@ const oauthService = {
 				const existingUser = await userService.selectByEmailIncludeDel(c, defaultEmail);
 				isEmailAvailable = !existingUser;
 			} catch (error) {
-				isEmailAvailable = false;
+				// 日志记录检查邮箱可用性时发生的错误，并向上抛出业务异常
+				console.error("Failed to check email availability for:", defaultEmail, error);
+				throw new BizError("Failed to check email availability");
 			}
 			
 			if (!isEmailAvailable) {
