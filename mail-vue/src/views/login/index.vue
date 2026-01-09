@@ -15,7 +15,7 @@
         <span class="form-desc" v-else>{{ $t('regTitle') }}</span>
         <div v-show="show === 'login'">
           <el-input :class="settingStore.settings.loginDomain === 0 ? 'email-input' : ''" v-model="form.email"
-                    type="text" :placeholder="$t('emailAccount')" autocomplete="off">
+                    type="text" :placeholder="$t('emailAccount')" autocomplete="username">
             <template #append v-if="settingStore.settings.loginDomain === 0">
               <div @click.stop="openSelect">
                 <el-select
@@ -39,7 +39,7 @@
               </div>
             </template>
           </el-input>
-          <el-input v-model="form.password" :placeholder="$t('password')" type="password" autocomplete="off">
+          <el-input v-model="form.password" :placeholder="$t('password')" type="password" autocomplete="current-password">
           </el-input>
           <el-button class="btn" type="primary" @click="submit" :loading="loginLoading"
           >{{ $t('loginBtn') }}
@@ -77,7 +77,7 @@
               </div>
             </template>
           </el-input>
-          <el-input v-model="registerForm.password" :placeholder="$t('password')" type="password" autocomplete="off"/>
+          <el-input v-model="registerForm.password" :placeholder="$t('password')" type="password" autocomplete="new-password"/>
           <el-input v-model="registerForm.confirmPassword" :placeholder="$t('confirmPwd')" type="password"
                     autocomplete="off"/>
           <el-input v-if="settingStore.settings.regKey === 0" v-model="registerForm.code" :placeholder="$t('regKey')"
@@ -912,6 +912,17 @@ function submitRegister() {
   }
 }
 
+@keyframes fadeTrail {
+  0% {
+    opacity: 0.9;
+    transform: translateY(-50%) scaleX(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-50%) scaleX(0.3);
+  }
+}
+
 .x1 {
   animation: animateUnicorn 30s linear infinite;
   transform: scale(0.65);
@@ -951,10 +962,10 @@ function submitRegister() {
 .unicorn::after {
   content: '';
   position: absolute;
-  width: 300px;
-  height: 35px;
+  width: 250px;
+  height: 30px;
   top: 55%;
-  left: -280px;
+  left: -240px;
   transform: translateY(-50%);
   background: linear-gradient(
     90deg,
@@ -962,14 +973,19 @@ function submitRegister() {
     #FF0000, #FF7F00, #FFFF00, #00FF00, #0000FF, #4B0082, #9400D3
   );
   background-size: 200% 100%;
-  border-radius: 100px;
-  filter: blur(8px);
-  opacity: 0.8;
+  border-radius: 0;
+  filter: blur(6px);
+  opacity: 0.85;
   z-index: -1;
-  animation: trailFlow 0.5s linear infinite reverse;
-  /* 只有 Webkit 浏览器支持 mask-image 时需要前缀，Vite 自动处理或手动添加 */
-  -webkit-mask-image: linear-gradient(to right, transparent 0%, black 40%, black 100%);
-  mask-image: linear-gradient(to right, transparent 0%, black 40%, black 100%);
+  animation: trailFlow 2.5s linear infinite reverse;
+  box-shadow: 
+    -30px 0 20px 5px rgba(255, 0, 0, 0.3),
+    -60px 0 25px 8px rgba(255, 127, 0, 0.25),
+    -90px 0 30px 10px rgba(255, 255, 0, 0.2),
+    -120px 0 35px 12px rgba(0, 255, 0, 0.15),
+    -150px 0 40px 15px rgba(0, 0, 255, 0.1);
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, black 30%, black 100%);
+  mask-image: linear-gradient(to right, transparent 0%, black 30%, black 100%);
 }
 
 </style>
