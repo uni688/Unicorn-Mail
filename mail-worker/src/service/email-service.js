@@ -256,7 +256,7 @@ const emailService = {
 		}
 
 		//把图片标签cid标签切换会通用url
-		imageDataList = imageDataList.map(item => ({...item, contentId: `<${item.contentId}>`}))
+		imageDataList = imageDataList.map(item => ({...item, contentId: `<${item.contentId}>`}));
 		html = this.imgReplace(html, imageDataList, r2Domain);
 
 		const emailData = {};
