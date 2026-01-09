@@ -1156,7 +1156,13 @@ function getSettings() {
     loginOpacity.value = setting.value.loginOpacity
     minEmailPrefix.value = setting.value.minEmailPrefix
     // 初始化R2存储设置，转换为GB和天
-    r2MaxSize.value = Math.round((setting.value.r2MaxSize || 10737418240) / 1073741824)
+    const r2MaxSizeBytes = setting.value.r2MaxSize
+    if (r2MaxSizeBytes == null) {
+      // 数据库值缺失时，使用默认10GB（10737418240字节）
+      r2MaxSize.value = 10
+    } else {
+      r2MaxSize.value = Math.round(r2MaxSizeBytes / 1073741824)
+    }
     r2FileExpireDays.value = setting.value.r2FileExpireDays || 7
     firstLoading.value = false
     backgroundUrl.value = setting.value.background?.startsWith('http') ? setting.value.background : ''
