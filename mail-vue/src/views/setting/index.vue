@@ -32,6 +32,11 @@
       <div class="item">
         <div>{{$t('emailAutoDelete')}}</div>
         <div>
+          <el-switch
+            v-model="emailAutoDeleteEnabled"
+            @change="handleEmailAutoDeleteSwitchChange"
+            style="margin-right: 15px"
+          />
           <el-tooltip effect="dark" :content="$t('emailAutoDeleteDesc')">
             <el-input-number 
               v-model="emailAutoDeleteDays" 
@@ -39,6 +44,7 @@
               :min="1" 
               :max="30" 
               :precision="0" 
+              :disabled="!emailAutoDeleteEnabled"
               style="width: 150px"
             >
               <template #suffix>
@@ -101,6 +107,7 @@ const setPwdLoading = ref(false)
 const setNameShow = ref(false)
 const accountName = ref(null)
 const emailAutoDeleteDays = ref(30)
+const emailAutoDeleteEnabled = ref(false)
 const setEmailAutoDeleteLoading = ref(false)
 const unbindGithubLoading = ref(false)
 
@@ -192,6 +199,26 @@ const handleSetEmailAutoDeleteDays = () => {
   })
 }
 
+// 邮件自动删除开关切换
+const handleEmailAutoDeleteSwitchChange = (val) => {
+  if (val) {
+    handleSetEmailAutoDeleteDays()
+  } else {
+    setEmailAutoDeleteLoading.value = true
+    setEmailAutoDeleteDays(0).then(() => {
+      ElMessage({
+        message: t('saveSuccessMsg'),
+        type: 'success',
+        plain: true,
+      })
+      setEmailAutoDeleteLoading.value = false
+    }).catch(() => {
+      emailAutoDeleteEnabled.value = true
+      setEmailAutoDeleteLoading.value = false
+    })
+  }
+}
+
 // 绑定GitHub账号
 const bindGithub = () => {
   const clientId = settingStore.settings.githubClientId
@@ -209,10 +236,12 @@ const handleUnbindGithub = () => {
 // 组件挂载时获取用户信息，包括邮件自动删除设置
 onMounted(() => {
   // 从用户信息中获取邮件自动删除设置
-  if (userStore.user.emailAutoDeleteDays) {
+  if (userStore.user.emailAutoDeleteDays && userStore.user.emailAutoDeleteDays > 0) {
     emailAutoDeleteDays.value = userStore.user.emailAutoDeleteDays
+    emailAutoDeleteEnabled.value = true
   } else {
     emailAutoDeleteDays.value = 30
+    emailAutoDeleteEnabled.value = false
   }
 })
 

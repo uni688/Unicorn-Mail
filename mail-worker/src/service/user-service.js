@@ -263,10 +263,14 @@ const userService = {
 	},
 
 	async setEmailAutoDeleteDays(c, params, userId) {
-		const { emailAutoDeleteDays } = params;
-		// 限制天数范围为1-30天
-		const days = Math.max(1, Math.min(30, emailAutoDeleteDays));
-		await orm(c).update(user).set({ emailAutoDeleteDays: days }).where(eq(user.userId, userId)).run();
+		let { emailAutoDeleteDays } = params;
+		// 限制天数范围为1-30天，0为关闭
+		if (emailAutoDeleteDays > 0) {
+			emailAutoDeleteDays = Math.max(1, Math.min(30, emailAutoDeleteDays));
+		} else {
+			emailAutoDeleteDays = 0;
+		}
+		await orm(c).update(user).set({ emailAutoDeleteDays }).where(eq(user.userId, userId)).run();
 	},
 
 	async setStatus(c, params) {
