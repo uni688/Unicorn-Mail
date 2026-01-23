@@ -229,8 +229,8 @@ const bindGithub = () => {
 
 // 解绑GitHub账号
 const handleUnbindGithub = () => {
-  // Delegate to the shared confirmation logic to avoid duplication
-  showUnbindConfirm()
+  // TODO: Implement the actual GitHub unbind logic here directly,
+  // without calling showUnbindConfirm, to avoid circular references.
 }
 
 // 组件挂载时获取用户信息，包括邮件自动删除设置
