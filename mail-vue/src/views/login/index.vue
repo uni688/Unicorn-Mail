@@ -1,11 +1,11 @@
 <template>
   <div id="login-box" :style=" background ? 'background: var(--el-bg-color)' : ''" v-loading="oauthLoading" element-loading-text="登录中...">
     <div id="background-wrap" v-if="!settingStore.settings.background">
-      <div class="x1 cloud"></div>
-      <div class="x2 cloud"></div>
-      <div class="x3 cloud"></div>
-      <div class="x4 cloud"></div>
-      <div class="x5 cloud"></div>
+      <div class="x1 unicorn"></div>
+      <div class="x2 unicorn"></div>
+      <div class="x3 unicorn"></div>
+      <div class="x4 unicorn"></div>
+      <div class="x5 unicorn"></div>
     </div>
     <div v-else :style="background"></div>
     <div class="form-wrapper">
@@ -15,7 +15,7 @@
         <span class="form-desc" v-else>{{ $t('regTitle') }}</span>
         <div v-show="show === 'login'">
           <el-input :class="settingStore.settings.loginDomain === 0 ? 'email-input' : ''" v-model="form.email"
-                    type="text" :placeholder="$t('emailAccount')" autocomplete="off">
+                    type="text" :placeholder="$t('emailAccount')" autocomplete="username">
             <template #append v-if="settingStore.settings.loginDomain === 0">
               <div @click.stop="openSelect">
                 <el-select
@@ -39,13 +39,16 @@
               </div>
             </template>
           </el-input>
-          <el-input v-model="form.password" :placeholder="$t('password')" type="password" autocomplete="off">
+          <el-input v-model="form.password" :placeholder="$t('password')" type="password" autocomplete="current-password">
           </el-input>
           <el-button class="btn" type="primary" @click="submit" :loading="loginLoading"
           >{{ $t('loginBtn') }}
           </el-button>
           <el-button class="btn" v-if="settingStore.settings.linuxdoSwitch"  style="margin-top: 10px"  @click="linuxDoLogin">
             <el-avatar src="/image/linuxdo.webp" :size="18" style="margin-right: 10px" />LinuxDo
+          </el-button>
+          <el-button class="btn" v-if="settingStore.settings.githubSwitch"  style="margin-top: 10px"  @click="githubLogin">
+            <el-avatar src="https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png" :size="18" style="margin-right: 10px" />GitHub
           </el-button>
         </div>
         <div v-show="show !== 'login'">
@@ -74,7 +77,7 @@
               </div>
             </template>
           </el-input>
-          <el-input v-model="registerForm.password" :placeholder="$t('password')" type="password" autocomplete="off"/>
+          <el-input v-model="registerForm.password" :placeholder="$t('password')" type="password" autocomplete="new-password"/>
           <el-input v-model="registerForm.confirmPassword" :placeholder="$t('confirmPwd')" type="password"
                     autocomplete="off"/>
           <el-input v-if="settingStore.settings.regKey === 0" v-model="registerForm.code" :placeholder="$t('regKey')"
@@ -131,6 +134,23 @@
             </div>
           </template>
         </el-input>
+        
+        <!-- 邮箱建议显示区域 -->
+        <div v-if="showEmailSuggestions && emailSuggestions.length > 0" class="email-suggestions">
+          <div class="suggestion-title">{{ $t('emailSuggestions') }}</div>
+          <div class="suggestion-list">
+            <div 
+              v-for="(suggestion, index) in emailSuggestions" 
+              :key="index"
+              :class="['suggestion-item', { 'recommended': index === 0 }]"
+              @click="selectEmailSuggestion(suggestion)"
+            >
+              <span class="suggestion-email">{{ suggestion }}</span>
+              <span v-if="index === 0" class="recommended-tag">{{ $t('recommended') }}</span>
+            </div>
+          </div>
+        </div>
+        
         <el-input v-if="settingStore.settings.regKey === 0" v-model="bindForm.code" :placeholder="$t('regKey')"
                   type="text" autocomplete="off"/>
         <el-input v-if="settingStore.settings.regKey === 2" v-model="bindForm.code"
@@ -140,9 +160,6 @@
         </el-button>
       </div>
     </el-dialog>
-    <a class="github" href="https://github.com/maillab/cloud-mail">
-      <Icon icon="mingcute:github-line" color="#1890ff" width="20" height="20" />
-    </a>
   </div>
 </template>
 
@@ -161,7 +178,7 @@ import {cvtR2Url} from "@/utils/convert.js";
 import {loginUserInfo} from "@/request/my.js";
 import {permsToRouter} from "@/perm/perm.js";
 import {useI18n} from "vue-i18n";
-import {oauthBindUser, oauthLinuxDoLogin} from "@/request/ouath.js";
+import {oauthBindUser, oauthLinuxDoLogin, oauthGithubLogin} from "@/request/ouath.js";
 
 const {t} = useI18n();
 const accountStore = useAccountStore();
@@ -179,6 +196,11 @@ const bindForm = reactive({
   oauthUserId: '',
   code: ''
 })
+
+// 邮箱建议相关状态
+const emailSuggestions = ref([]);
+const showEmailSuggestions = ref(false);
+const recommendedEmail = ref('');
 
 const form = reactive({
   email: '',
@@ -257,25 +279,55 @@ function linuxDoLogin() {
       `https://connect.linux.do/oauth2/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=code&scope=openid+profile+email`
 }
 
-linuxDoGetUser();
+function githubLogin() {
+  const clientId = settingStore.settings.githubClientId
+  const redirectUri = encodeURIComponent(settingStore.settings.githubCallbackUrl)
+  window.location.href =
+      `https://github.com/login/oauth/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=code&scope=user:email`
+}
 
-async function linuxDoGetUser() {
+oauthGetUser();
 
+async function oauthGetUser() {
   const params = new URLSearchParams(window.location.search)
   const code = params.get('code')
+  const pathname = window.location.pathname
+  // 根据URL路径判断provider
+  const provider = pathname.includes('github') ? 'github' : 'linuxdo'
 
   if (code) {
-
     oauthLoading.value = true
-    oauthLinuxDoLogin(code).then(data => {
-
+    let oauthLoginPromise
+    
+    if (provider === 'github') {
+      oauthLoginPromise = oauthGithubLogin(code)
+    } else {
+      oauthLoginPromise = oauthLinuxDoLogin(code)
+    }
+    
+    oauthLoginPromise.then(data => {
       bindForm.oauthUserId = data.userInfo.oauthUserId;
 
       if (!data.token) {
+        // 设置默认邮箱
+        if (data.defaultEmail) {
+          bindForm.email = data.defaultEmail;
+        }
+        
+        // 处理邮箱建议
+        if (data.emailSuggestions && data.emailSuggestions.length > 0) {
+          emailSuggestions.value = data.emailSuggestions;
+          recommendedEmail.value = data.emailSuggestions[0];
+          showEmailSuggestions.value = true;
+        } else {
+          emailSuggestions.value = [];
+          showEmailSuggestions.value = false;
+        }
+        
         showBindForm.value = true
         oauthLoading.value = false
         ElMessage({
-          message: '请注册绑定一个邮箱',
+          message: '请先绑定邮箱',
           type: 'warning',
           duration: 4000,
           plain: true,
@@ -284,13 +336,37 @@ async function linuxDoGetUser() {
       }
 
       saveToken(data.token);
-    }).catch(() => {
+    }).catch((error) => {
+      console.error('OAuth login failed:', error)
       oauthLoading.value = false
+      ElMessage({
+        message: t('loginFailMsg'),
+        type: 'error',
+        duration: 4000,
+        plain: true,
+      })
     })
   }
 
-  const cleanUrl = window.location.origin + window.location.pathname
-  window.history.replaceState({}, '', cleanUrl)
+  // 只有在有code参数时才清理URL，避免影响正常的页面访问
+  if (code) {
+    const cleanUrl = window.location.origin + window.location.pathname
+    window.history.replaceState({}, '', cleanUrl)
+  }
+}
+
+// 选择邮箱建议
+function selectEmailSuggestion(email) {
+  // 解析邮箱，获取用户名和域名
+  const [username, domain] = email.split('@');
+  bindForm.email = username;
+  // 设置对应的后缀
+  const domainIndex = domainList.findIndex(d => d === '@' + domain);
+  if (domainIndex !== -1) {
+    suffix.value = domainList[domainIndex];
+  }
+  // 选择后隐藏建议列表
+  showEmailSuggestions.value = false;
 }
 
 function bind() {
@@ -523,11 +599,32 @@ function submitRegister() {
     verifyToken = ''
     settingStore.settings.regVerifyOpen = regVerifyOpen
     verifyShow.value = false
-    ElMessage({
-      message: t('regSuccessMsg'),
-      type: 'success',
-      plain: true,
-    })
+    
+    // 注册成功后，询问是否绑定GitHub
+    if (settingStore.settings.githubSwitch) {
+      ElMessageBox.confirm('是否立即绑定 GitHub？', t('regSuccessMsg'), {
+        confirmButtonText: t('confirm'),
+        cancelButtonText: t('cancel'),
+        type: 'info'
+      }).then(() => {
+        // 绑定GitHub
+        githubLogin()
+      }).catch(() => {
+        // 不绑定，显示成功提示
+        ElMessage({
+          message: t('regSuccessMsg'),
+          type: 'success',
+          plain: true,
+        })
+      })
+    } else {
+      // GitHub开关未开启，直接显示成功提示
+      ElMessage({
+        message: t('regSuccessMsg'),
+        type: 'success',
+        plain: true,
+      })
+    }
   }).catch(res => {
 
     registerLoading.value = false
@@ -666,10 +763,62 @@ function submitRegister() {
 }
 
 .bind-container {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 15px;
-}
+		display: grid;
+		grid-template-columns: 1fr;
+		gap: 15px;
+	}
+
+	.email-suggestions {
+		background-color: var(--el-bg-color);
+		border: 1px solid var(--el-border-color-light);
+		border-radius: 6px;
+		padding: 10px;
+	}
+
+	.suggestion-title {
+		font-size: 14px;
+		font-weight: bold;
+		margin-bottom: 8px;
+		color: var(--el-text-color-primary);
+	}
+
+	.suggestion-list {
+		display: flex;
+		flex-direction: column;
+		gap: 5px;
+	}
+
+	.suggestion-item {
+		padding: 8px 12px;
+		border-radius: 4px;
+		cursor: pointer;
+		font-size: 14px;
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		transition: all 0.2s;
+	}
+
+	.suggestion-item:hover {
+		background-color: var(--el-color-primary-light-9);
+	}
+
+	.suggestion-item.recommended {
+		background-color: var(--el-color-primary-light-10);
+		border: 1px solid var(--el-color-primary-light-5);
+	}
+
+	.recommended-tag {
+		font-size: 12px;
+		color: var(--el-color-primary);
+		background-color: var(--el-color-primary-light-9);
+		padding: 2px 6px;
+		border-radius: 3px;
+	}
+
+	.suggestion-email {
+		color: var(--el-text-color-primary);
+	}
 
 .setting-icon {
   position: relative;
@@ -744,7 +893,7 @@ function submitRegister() {
   z-index: 0;
 }
 
-@keyframes animateCloud {
+@keyframes animateUnicorn {
   0% {
     margin-left: -500px;
   }
@@ -754,62 +903,89 @@ function submitRegister() {
   }
 }
 
+@keyframes trailFlow {
+  0% {
+    background-position: 0% 50%;
+  }
+  100% {
+    background-position: 200% 50%;
+  }
+}
+
+@keyframes fadeTrail {
+  0% {
+    opacity: 0.9;
+    transform: translateY(-50%) scaleX(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-50%) scaleX(0.3);
+  }
+}
+
 .x1 {
-  animation: animateCloud 30s linear infinite;
+  animation: animateUnicorn 30s linear infinite;
   transform: scale(0.65);
 }
 
 .x2 {
-  animation: animateCloud 15s linear infinite;
+  animation: animateUnicorn 15s linear infinite;
   transform: scale(0.3);
 }
 
 .x3 {
-  animation: animateCloud 25s linear infinite;
+  animation: animateUnicorn 25s linear infinite;
   transform: scale(0.5);
 }
 
 .x4 {
-  animation: animateCloud 13s linear infinite;
+  animation: animateUnicorn 13s linear infinite;
   transform: scale(0.4);
 }
 
 .x5 {
-  animation: animateCloud 20s linear infinite;
+  animation: animateUnicorn 20s linear infinite;
   transform: scale(0.55);
 }
 
-.cloud {
-  background: linear-gradient(to bottom, #fff 5%, #f1f1f1 100%);
-  border-radius: 100px;
-  box-shadow: 0 8px 5px rgba(0, 0, 0, 0.1);
-  height: 120px;
-  width: 350px;
+.unicorn {
+  background-image: url('/image/unicorn.svg');
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  height: 150px;
+  width: 200px;
   position: relative;
+  filter: drop-shadow(0 0 10px rgba(255, 255, 255, 0.5));
 }
 
-.cloud:after,
-.cloud:before {
-  content: "";
+.unicorn::after {
+  content: '';
   position: absolute;
-  background: #fff;
+  width: 250px;
+  height: 30px;
+  top: 55%;
+  left: -240px;
+  transform: translateY(-50%);
+  background: linear-gradient(
+    90deg,
+    #FF0000, #FF7F00, #FFFF00, #00FF00, #0000FF, #4B0082, #9400D3,
+    #FF0000, #FF7F00, #FFFF00, #00FF00, #0000FF, #4B0082, #9400D3
+  );
+  background-size: 200% 100%;
+  border-radius: 0;
+  filter: blur(6px);
+  opacity: 0.85;
   z-index: -1;
-}
-
-.cloud:after {
-  border-radius: 100px;
-  height: 100px;
-  left: 50px;
-  top: -50px;
-  width: 100px;
-}
-
-.cloud:before {
-  border-radius: 200px;
-  height: 180px;
-  width: 180px;
-  right: 50px;
-  top: -90px;
+  animation: trailFlow 2.5s linear infinite reverse;
+  box-shadow: 
+    -30px 0 20px 5px rgba(255, 0, 0, 0.3),
+    -60px 0 25px 8px rgba(255, 127, 0, 0.25),
+    -90px 0 30px 10px rgba(255, 255, 0, 0.2),
+    -120px 0 35px 12px rgba(0, 255, 0, 0.15),
+    -150px 0 40px 15px rgba(0, 0, 255, 0.1);
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, black 30%, black 100%);
+  mask-image: linear-gradient(to right, transparent 0%, black 30%, black 100%);
 }
 
 </style>

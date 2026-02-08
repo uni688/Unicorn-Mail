@@ -14,6 +14,11 @@ const base64urlDecode = (str) => {
 
 const jwtUtils = {
 	async generateToken(c, payload, expiresInSeconds) {
+		const jwtSecret = c.env.jwt_secret;
+		if (!jwtSecret) {
+			throw new Error('jwt_secret is not configured. Please set jwt_secret in wrangler.toml or environment variables.');
+		}
+
 		const header = {
 			alg: 'HS256',
 			typ: 'JWT'
@@ -34,7 +39,7 @@ const jwtUtils = {
 
 		const key = await crypto.subtle.importKey(
 			'raw',
-			encoder.encode(c.env.jwt_secret),
+			encoder.encode(jwtSecret),
 			{ name: 'HMAC', hash: 'SHA-256' },
 			false,
 			['sign']
@@ -48,6 +53,12 @@ const jwtUtils = {
 
 	async verifyToken(c, token) {
 		try {
+			const jwtSecret = c.env.jwt_secret;
+			if (!jwtSecret) {
+				console.log('jwt_secret is not configured');
+				return null;
+			}
+
 			const [headerB64, payloadB64, signatureB64] = token.split('.');
 
 			if (!headerB64 || !payloadB64 || !signatureB64) return null;
@@ -55,7 +66,7 @@ const jwtUtils = {
 			const data = `${headerB64}.${payloadB64}`;
 			const key = await crypto.subtle.importKey(
 				'raw',
-				encoder.encode(c.env.jwt_secret),
+				encoder.encode(jwtSecret),
 				{ name: 'HMAC', hash: 'SHA-256' },
 				false,
 				['verify']
