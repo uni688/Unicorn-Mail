@@ -296,6 +296,8 @@ const en = {
     delAllConfirm: 'Do you really want to delete it?',
     pin: 'Pin',
     s3Configuration: 'S3 Configuration',
+    b2Compatibility: 'B2 Compatibility',
+    b2CompatibilityDesc: 'Enable Backblaze B2 Content-Disposition compatibility (add quotes)',
     confirmDeletionOfContacts: 'Confirm clearing contacts?',
     recentContacts: 'Recent contacts',
     selectContacts: 'Select',

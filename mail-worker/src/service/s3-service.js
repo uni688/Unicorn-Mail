@@ -8,7 +8,7 @@ const s3Service = {
 
 		const client = await this.client(c);
 
-		const { bucket } = await settingService.query(c);
+		const { bucket, s3B2Compatibility } = await settingService.query(c);
 
 		let obj = { Bucket: bucket, Key: key, Body: content,
 			CacheControl: metadata.cacheControl
@@ -20,6 +20,14 @@ const s3Service = {
 
 		if (metadata.contentDisposition) {
 			obj.ContentDisposition = metadata.contentDisposition
+
+			if (s3B2Compatibility === 0) {
+				const regex = /^attachment;filename=(.*)$/;
+				const match = obj.ContentDisposition.match(regex);
+				if (match) {
+					obj.ContentDisposition = `attachment; filename="${match[1]}"`
+				}
+			}
 		}
 
 		if (metadata.contentType) {

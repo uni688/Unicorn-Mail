@@ -707,6 +707,16 @@
             <el-switch :before-change="beforeChange" :active-value="0" :inactive-value="1"
                        v-model="s3.forcePathStyle"/>
           </div>
+          <div class="force-path-style">
+            <div class="force-path-style-left">
+              <span>{{ $t('b2Compatibility') }}</span>
+              <el-tooltip effect="dark" :content="$t('b2CompatibilityDesc')">
+                <Icon class="warning" icon="fe:warning" width="18" height="18"/>
+              </el-tooltip>
+            </div>
+            <el-switch :before-change="beforeChange" :active-value="0" :inactive-value="1"
+                       v-model="s3.s3B2Compatibility"/>
+          </div>
           <div class="s3-button">
             <el-button :loading="clearS3Loading" @click="clearS3">{{ t('clear') }}</el-button>
             <el-button type="primary" :loading="settingLoading && !clearS3Loading" @click="saveS3">{{ t('save') }}</el-button>
@@ -807,7 +817,8 @@ const s3 = reactive({
   region: '',
   s3AccessKey: '',
   s3SecretKey: '',
-  forcePathStyle: 1
+  forcePathStyle: 1,
+  s3B2Compatibility: 1
 })
 
 const noticeForm = reactive({
@@ -899,6 +910,7 @@ function resetAddS3Form() {
   s3.s3AccessKey = ''
   s3.s3SecretKey = ''
   s3.forcePathStyle = setting.value.forcePathStyle
+  s3.s3B2Compatibility = setting.value.s3B2Compatibility
 }
 
 const resendList = computed(() => {
@@ -1086,7 +1098,8 @@ function clearS3() {
     region: '',
     s3AccessKey: '',
     s3SecretKey: '',
-    forcePathStyle: 1
+    forcePathStyle: 1,
+    s3B2Compatibility: 1
   }
   clearS3Loading.value = true
   editSetting(form)
@@ -1098,7 +1111,8 @@ function saveS3() {
     bucket: s3.bucket,
     endpoint: s3.endpoint,
     region: s3.region,
-    forcePathStyle: s3.forcePathStyle
+    forcePathStyle: s3.forcePathStyle,
+    s3B2Compatibility: s3.s3B2Compatibility
   }
 
   if (s3.s3AccessKey) form.s3AccessKey = s3.s3AccessKey
