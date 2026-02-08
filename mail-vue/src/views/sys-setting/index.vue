@@ -234,7 +234,7 @@
           </div>
 
           <!-- R2 Storage Setting Card -->
-          <div class="settings-card">
+          <div class="settings-card" v-if="setting.hasR2">
             <div class="card-title">{{ $t('r2StorageSetting') }}</div>
             <div class="card-content">
               <div class="setting-item">
