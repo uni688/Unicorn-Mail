@@ -303,6 +303,8 @@ const zh = {
     delAllConfirm: '确定要删除吗？',
     pin: '置顶',
     s3Configuration: 'S3 配置',
+    b2Compatibility: 'B2 兼容性',
+    b2CompatibilityDesc: '启用 Backblaze B2 桶的内容部署头兼容（添加引号）',
     confirmDeletionOfContacts: '确认清除这些联系人吗？',
     recentContacts: '最近联系人',
     selectContacts: '选中',
