@@ -34,6 +34,10 @@ const s3Service = {
 			obj.ContentType = metadata.contentType
 		}
 
+		if (content && content.byteLength) {
+			obj.ContentLength = content.byteLength
+		}
+
 		await client.send(new PutObjectCommand(obj))
 	},
 
