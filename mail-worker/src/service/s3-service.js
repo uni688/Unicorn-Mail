@@ -42,7 +42,7 @@ const s3Service = {
 			obj.ContentType = metadata.contentType
 		}
 
-		if (content && content.byteLength) {
+		if (typeof content?.byteLength === 'number') {
 			obj.ContentLength = content.byteLength
 		}
 
