@@ -8,7 +8,7 @@ const s3Service = {
 
 		const client = await this.client(c);
 
-		const { bucket } = await settingService.query(c);
+		const { bucket, s3B2Compatibility } = await settingService.query(c);
 
 		let obj = { Bucket: bucket, Key: key, Body: content,
 			CacheControl: metadata.cacheControl
@@ -20,10 +20,30 @@ const s3Service = {
 
 		if (metadata.contentDisposition) {
 			obj.ContentDisposition = metadata.contentDisposition
+
+			if (s3B2Compatibility === 0) {
+				const regex = /^(attachment|inline)\s*;\s*filename=(.+)$/i;
+				const match = obj.ContentDisposition.match(regex);
+				if (match) {
+					const dispositionType = match[1].toLowerCase();
+					let filename = match[2].trim();
+					if (
+						(filename.startsWith('"') && filename.endsWith('"')) ||
+						(filename.startsWith("'") && filename.endsWith("'"))
+					) {
+						filename = filename.slice(1, -1);
+					}
+					obj.ContentDisposition = `${dispositionType}; filename="${filename}"`;
+				}
+			}
 		}
 
 		if (metadata.contentType) {
 			obj.ContentType = metadata.contentType
+		}
+
+		if (typeof content?.byteLength === 'number') {
+			obj.ContentLength = content.byteLength
 		}
 
 		await client.send(new PutObjectCommand(obj))
