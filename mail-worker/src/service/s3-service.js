@@ -22,10 +22,18 @@ const s3Service = {
 			obj.ContentDisposition = metadata.contentDisposition
 
 			if (s3B2Compatibility === 0) {
-				const regex = /^attachment;filename=(.*)$/;
+				const regex = /^(attachment|inline)\s*;\s*filename=(.+)$/i;
 				const match = obj.ContentDisposition.match(regex);
 				if (match) {
-					obj.ContentDisposition = `attachment; filename="${match[1]}"`
+					const dispositionType = match[1].toLowerCase();
+					let filename = match[2].trim();
+					if (
+						(filename.startsWith('"') && filename.endsWith('"')) ||
+						(filename.startsWith("'") && filename.endsWith("'"))
+					) {
+						filename = filename.slice(1, -1);
+					}
+					obj.ContentDisposition = `${dispositionType}; filename="${filename}"`;
 				}
 			}
 		}
