@@ -1,25 +1,25 @@
 <p align="center">
     <img src="doc/demo/logo.png" width="80px" />
-    <h1 align="center">Cloud Mail</h1>
+    <h1 align="center">Unicorn Mail</h1>
     <p align="center">基于 Cloudflare 的简约响应式邮箱服务，支持邮件发送、附件收发 🎉</p> 
     <p align="center">
         简体中文 | <a href="/README-en.md" style="margin-left: 5px">English </a>
     </p>
     <p align="center">
-        <a href="https://github.com/maillab/cloud-mail/tree/main?tab=MIT-1-ov-file" target="_blank" >
+        <a href="https://github.com/uni688/Unicorn-Mail/tree/main?tab=MIT-1-ov-file" target="_blank" >
             <img src="https://img.shields.io/badge/license-MIT-green" />
         </a>    
-        <a href="https://github.com/maillab/cloud-mail/releases" target="_blank" >
-            <img src="https://img.shields.io/github/v/release/maillab/cloud-mail" alt="releases" />
+        <a href="https://github.com/uni688/Unicorn-Mail/releases" target="_blank" >
+            <img src="https://img.shields.io/github/v/release/uni688/Unicorn-Mail" alt="releases" />
         </a>  
-        <a href="https://github.com/maillab/cloud-mail/issues" >
-            <img src="https://img.shields.io/github/issues/maillab/cloud-mail" alt="issues" />
+        <a href="https://github.com/uni688/Unicorn-Mail/issues" >
+            <img src="https://img.shields.io/github/issues/uni688/Unicorn-Mail" alt="issues" />
         </a>  
-        <a href="https://github.com/maillab/cloud-mail/stargazers" target="_blank">
-            <img src="https://img.shields.io/github/stars/maillab/cloud-mail" alt="stargazers" />
+        <a href="https://github.com/uni688/Unicorn-Mail/stargazers" target="_blank">
+            <img src="https://img.shields.io/github/stars/uni688/Unicorn-Mail" alt="stargazers" />
         </a>  
-        <a href="https://github.com/maillab/cloud-mail/forks" target="_blank" >
-            <img src="https://img.shields.io/github/forks/maillab/cloud-mail" alt="forks" />
+        <a href="https://github.com/uni688/Unicorn-Mail/forks" target="_blank" >
+            <img src="https://img.shields.io/github/forks/uni688/Unicorn-Mail" alt="forks" />
         </a>
     </p>
     <p align="center">
@@ -97,7 +97,7 @@
 ## 目录结构
 
 ```
-cloud-mail
+unicorn-mail
 ├── mail-worker				    # worker后端项目
 │   ├── src                  
 │   │   ├── api	 			    # api接口层			
@@ -152,7 +152,7 @@ cloud-mail
 
 ## 交流
 
-[Telegram](https://t.me/cloud_mail_tg)
+[Telegram](https://t.me/unicorn_mail_tg)
 
 
 
