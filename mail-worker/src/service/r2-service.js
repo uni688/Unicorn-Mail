@@ -41,7 +41,51 @@ const r2Service = {
 	},
 
 	async getObj(c, key) {
-		return await c.env.r2.get(key);
+		const storageType = await this.storageType(c);
+		if (storageType === 'KV') {
+			return await c.env.kv.getWithMetadata(key, { type: "arrayBuffer" });
+		}
+		if (storageType === 'R2') {
+			return await c.env.r2.get(key);
+		}
+		return await s3Service.getObj(c, key);
+	},
+
+	async toObjResp(c, key) {
+		const storageType = await this.storageType(c);
+		const obj = await this.getObj(c, key);
+
+		if (!obj || (!obj.body && obj.value == null)) {
+			return new Response('Not Found', { status: 404 });
+		}
+
+		if (storageType === 'KV') {
+			return new Response(obj.value, {
+				headers: {
+					'Content-Type': obj.metadata?.contentType || 'application/octet-stream',
+					'Content-Disposition': obj.metadata?.contentDisposition || null,
+					'Cache-Control': obj.metadata?.cacheControl || null
+				}
+			});
+		}
+
+		if (storageType === 'R2') {
+			return new Response(obj.body, {
+				headers: {
+					'Content-Type': obj.httpMetadata?.contentType || 'application/octet-stream',
+					'Content-Disposition': obj.httpMetadata?.contentDisposition || null,
+					'Cache-Control': obj.httpMetadata?.cacheControl || null
+				}
+			});
+		}
+
+		return new Response(obj.Body, {
+			headers: {
+				'Content-Type': obj.ContentType || 'application/octet-stream',
+				'Content-Disposition': obj.ContentDisposition || null,
+				'Cache-Control': obj.CacheControl || null
+			}
+		});
 	},
 
 	async delete(c, key) {
