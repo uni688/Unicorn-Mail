@@ -4,6 +4,19 @@ import kvObjService from './kv-obj-service';
 
 const r2Service = {
 
+	toRespHeaders(contentType, contentDisposition, cacheControl) {
+		const headers = {
+			'Content-Type': contentType || 'application/octet-stream'
+		};
+		if (contentDisposition) {
+			headers['Content-Disposition'] = contentDisposition;
+		}
+		if (cacheControl) {
+			headers['Cache-Control'] = cacheControl;
+		}
+		return headers;
+	},
+
 	async storageType(c) {
 
 		const setting = await settingService.query(c);
@@ -40,8 +53,8 @@ const r2Service = {
 
 	},
 
-	async getObj(c, key) {
-		const storageType = await this.storageType(c);
+	async getObj(c, key, storageType) {
+		storageType = storageType || await this.storageType(c);
 		if (storageType === 'KV') {
 			return await c.env.kv.getWithMetadata(key, { type: "arrayBuffer" });
 		}
@@ -53,38 +66,63 @@ const r2Service = {
 
 	async toObjResp(c, key) {
 		const storageType = await this.storageType(c);
-		const obj = await this.getObj(c, key);
+		let obj;
+		try {
+			obj = await this.getObj(c, key, storageType);
+		} catch (error) {
+			if (error?.name === 'NoSuchKey' || error?.$metadata?.httpStatusCode === 404) {
+				return new Response('Not Found', { status: 404 });
+			}
+			throw error;
+		}
 
-		if (!obj || (!obj.body && obj.value == null)) {
+		if (!obj) {
 			return new Response('Not Found', { status: 404 });
 		}
 
 		if (storageType === 'KV') {
+			if (obj.value == null) {
+				return new Response('Not Found', { status: 404 });
+			}
 			return new Response(obj.value, {
-				headers: {
-					'Content-Type': obj.metadata?.contentType || 'application/octet-stream',
-					'Content-Disposition': obj.metadata?.contentDisposition || null,
-					'Cache-Control': obj.metadata?.cacheControl || null
-				}
+				headers: this.toRespHeaders(
+					obj.metadata?.contentType,
+					obj.metadata?.contentDisposition,
+					obj.metadata?.cacheControl
+				)
 			});
 		}
 
 		if (storageType === 'R2') {
+			if (!obj.body) {
+				return new Response('Not Found', { status: 404 });
+			}
 			return new Response(obj.body, {
-				headers: {
-					'Content-Type': obj.httpMetadata?.contentType || 'application/octet-stream',
-					'Content-Disposition': obj.httpMetadata?.contentDisposition || null,
-					'Cache-Control': obj.httpMetadata?.cacheControl || null
-				}
+				headers: this.toRespHeaders(
+					obj.httpMetadata?.contentType,
+					obj.httpMetadata?.contentDisposition,
+					obj.httpMetadata?.cacheControl
+				)
 			});
 		}
 
-		return new Response(obj.Body, {
-			headers: {
-				'Content-Type': obj.ContentType || 'application/octet-stream',
-				'Content-Disposition': obj.ContentDisposition || null,
-				'Cache-Control': obj.CacheControl || null
-			}
+		if (!obj.Body) {
+			return new Response('Not Found', { status: 404 });
+		}
+
+		let body = obj.Body;
+		if (typeof body.transformToWebStream === 'function') {
+			body = body.transformToWebStream();
+		} else if (typeof body.transformToByteArray === 'function') {
+			body = new Uint8Array(await body.transformToByteArray());
+		}
+
+		return new Response(body, {
+			headers: this.toRespHeaders(
+				obj.ContentType,
+				obj.ContentDisposition,
+				obj.CacheControl
+			)
 		});
 	},
 
