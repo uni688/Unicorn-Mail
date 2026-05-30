@@ -56,6 +56,10 @@ const r2Service = {
 		}
 	},
 
+	async toObjResp(c, key) {
+		return await this.getObj(c, key);
+	},
+
 	async delete(c, key) {
 
 		const storageType = await this.storageType(c);
