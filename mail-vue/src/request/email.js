@@ -5,7 +5,7 @@ export function emailList(accountId, allReceive, emailId, timeSort, size, type) 
 }
 
 export function emailDelete(emailIds) {
-    return http.delete('/email/delete?emailIds=' + emailIds)
+    return http.delete('/email/delete', {params: {emailIds}})
 }
 
 export function emailLatest(emailId, accountId, allReceive) {
