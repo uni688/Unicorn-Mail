@@ -2,7 +2,7 @@ const domainUtils = {
 	toOssDomain(domain) {
 
 		if (!domain) {
-			return null
+			return ''
 		}
 
 		if (!domain.startsWith('http')) {
@@ -14,6 +14,16 @@ const domainUtils = {
 		}
 
 		return domain
+	},
+
+	envDomainList(domain) {
+		if (!domain) {
+			return []
+		}
+		if (Array.isArray(domain)) {
+			return domain.map(item => String(item).trim().toLowerCase()).filter(Boolean)
+		}
+		return String(domain).split(',').map(item => item.trim().toLowerCase()).filter(Boolean)
 	}
 }
 

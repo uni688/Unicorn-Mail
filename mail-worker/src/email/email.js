@@ -35,10 +35,17 @@ export async function email(message, env, ctx) {
 
 		const reader = message.raw.getReader();
 		let content = '';
+		let totalBytes = 0;
+		const maxBytes = 25 * 1024 * 1024;
 
 		while (true) {
 			const { done, value } = await reader.read();
 			if (done) break;
+			totalBytes += value.byteLength;
+			if (totalBytes > maxBytes) {
+				message.setReject('Message too large');
+				return;
+			}
 			content += new TextDecoder().decode(value);
 		}
 
@@ -103,7 +110,7 @@ export async function email(message, env, ctx) {
 		const attachments = [];
 		const cidAttachments = [];
 
-		for (let item of email.attachments) {
+		for (let item of (email.attachments || [])) {
 			let attachment = { ...item };
 			attachment.key = constant.ATTACHMENT_PREFIX + await fileUtils.getBuffHash(attachment.content) + fileUtils.getExtFileName(item.filename);
 			attachment.size = item.content.length ?? item.content.byteLength;
