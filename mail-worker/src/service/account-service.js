@@ -12,6 +12,7 @@ import turnstileService from './turnstile-service';
 import roleService from './role-service';
 import { t } from '../i18n/i18n';
 import verifyRecordService from './verify-record-service';
+import domainUtils from '../utils/domain-uitls';
 
 const accountService = {
 
@@ -35,7 +36,7 @@ const accountService = {
 			throw new BizError(t('notEmail'));
 		}
 
-		if (!c.env.domain.includes(emailUtils.getDomain(email))) {
+		if (!domainUtils.envDomainList(c.env.domain).includes(emailUtils.getDomain(email).toLowerCase())) {
 			throw new BizError(t('notExistDomain'));
 		}
 
@@ -147,6 +148,10 @@ const accountService = {
 		const user = await userService.selectById(c, userId);
 		const accountRow = await this.selectById(c, accountId);
 
+		if (!accountRow) {
+			throw new BizError(t('notExistAccount') || 'Account not found');
+		}
+
 		if (accountRow.email === user.email) {
 			throw new BizError(t('delMyAccount'));
 		}
@@ -233,9 +238,13 @@ const accountService = {
 		num = (num - 1) * size;
 
 		const userRow = await userService.selectByIdIncludeDel(c, userId);
+		if (!userRow) {
+			throw new BizError(t('notExistUser'));
+		}
 
-		const list = await orm(c).select().from(account).where(and(eq(account.userId, userId),ne(account.email,userRow.email))).limit(size).offset(num);
-		const { total } = await orm(c).select({ total: count() }).from(account).where(eq(account.userId, userId)).get();
+		const conditions = and(eq(account.userId, userId),ne(account.email,userRow.email));
+		const list = await orm(c).select().from(account).where(conditions).limit(size).offset(num);
+		const { total } = await orm(c).select({ total: count() }).from(account).where(conditions).get();
 
 		return { list, total }
 	},
@@ -247,11 +256,13 @@ const accountService = {
 	},
 
 	async setAllReceive(c, params, userId) {
-		let a = null
 		const { accountId } = params;
 		const accountRow = await this.selectById(c, accountId);
+		if (!accountRow) {
+			throw new BizError(t('notExistAccount') || 'Account not found');
+		}
 		if (accountRow.userId !== userId) {
-			return;
+			throw new BizError(t('noUserAccount'), 403);
 		}
 		await orm(c).update(account).set({ allReceive: accountConst.allReceive.CLOSE }).where(eq(account.userId, userId)).run();
 		await orm(c).update(account).set({ allReceive: accountRow.allReceive ? 0 : 1 }).where(eq(account.accountId, accountId)).run();
@@ -259,9 +270,18 @@ const accountService = {
 
 	async setAsTop(c, params, userId) {
 		const { accountId } = params;
-		console.log(accountId);
+		const accountRow = await this.selectById(c, accountId);
+		if (!accountRow) {
+			throw new BizError(t('notExistAccount') || 'Account not found');
+		}
+		if (accountRow.userId !== userId) {
+			throw new BizError(t('noUserAccount'), 403);
+		}
 		const userRow = await userService.selectById(c, userId);
 		const mainAccountRow = await accountService.selectByEmailIncludeDel(c, userRow.email);
+		if (!mainAccountRow) {
+			throw new BizError(t('notExistAccount') || 'Account not found');
+		}
 		let mainSort = mainAccountRow.sort === 0 ? 2 : mainAccountRow.sort + 1;
 		await orm(c).update(account).set({ sort: mainSort }).where(eq(account.email, userRow.email )).run();
 		await orm(c).update(account).set({ sort: mainSort - 1 }).where(and(eq(account.accountId, accountId),eq(account.userId,userId))).run();

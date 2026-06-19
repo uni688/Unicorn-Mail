@@ -61,9 +61,16 @@ const fileUtils = {
 
 		const filename = `${customFilename || `${type}_${Date.now()}`}.${ext}`;
 		return new File([blob], filename, { type: mimeType });
+	},
+
+	contentDisposition(filename, inline = false) {
+		const safeName = String(filename || 'attachment')
+			.replace(/[\r\n]/g, '')
+			.replace(/["\\]/g, '_');
+		const encodedName = encodeURIComponent(safeName);
+		return `${inline ? 'inline' : 'attachment'}; filename="${safeName}"; filename*=UTF-8''${encodedName}`;
 	}
 };
 
 
 export default fileUtils;
-

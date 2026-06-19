@@ -21,6 +21,7 @@ import domainUtils from '../utils/domain-uitls';
 import account from "../entity/account";
 import { att } from '../entity/att';
 import telegramService from './telegram-service';
+import verifyUtils from '../utils/verify-utils';
 
 const emailService = {
 
@@ -135,7 +136,13 @@ const emailService = {
 
 	async delete(c, params, userId) {
 		const { emailIds } = params;
-		const emailIdList = emailIds.split(',').map(Number);
+		if (!emailIds) {
+			return;
+		}
+		const emailIdList = emailIds.split(',').map(Number).filter(Number.isSafeInteger);
+		if (emailIdList.length === 0) {
+			return;
+		}
 		await orm(c).update(email).set({ isDel: isDel.DELETE }).where(
 			and(
 				eq(email.userId, userId),
@@ -160,12 +167,29 @@ const emailService = {
 			text, //邮件纯文本
 			content, //邮件内容
 			subject, //邮件标题
-			attachments //附件
+			attachments = [] //附件
 		} = params;
 
 		const { resendTokens, r2Domain, send, domainList } = await settingService.query(c);
 
+		if (!Array.isArray(receiveEmail) || receiveEmail.length === 0) {
+			throw new BizError(t('noRecipient') || 'Recipient required');
+		}
+		receiveEmail = [...new Set(receiveEmail.map(item => String(item).trim()).filter(Boolean))];
+		if (receiveEmail.length === 0 || receiveEmail.some(item => !verifyUtils.isEmail(item))) {
+			throw new BizError(t('notEmail'));
+		}
+		if (!Array.isArray(attachments)) {
+			throw new BizError(t('attLimit'));
+		}
+		if (attachments.length > 10) {
+			throw new BizError(t('attLimit'));
+		}
+
 		let { imageDataList, html } = await attService.toImageUrlHtml(c, content);
+		if (imageDataList.length > 10) {
+			throw new BizError(t('imageAttLimit'));
+		}
 
 		//判断是否关闭发件功能
 		if (send === settingConst.send.CLOSE) {
@@ -331,17 +355,11 @@ const emailService = {
 
 		//保存内嵌附件
 		if (imageDataList.length > 0) {
-			if (imageDataList.length > 10) {
-				throw new BizError(t('imageAttLimit'));
-			}
 			await attService.saveArticleAtt(c, imageDataList, userId, accountId, emailResult.emailId);
 		}
 
 		//保存普通附件
 		if (attachments?.length > 0) {
-			if (attachments.length > 10) {
-				throw new BizError(t('attLimit'));
-			}
 			await attService.saveSendAtt(c, attachments, userId, accountId, emailResult.emailId);
 		}
 
@@ -461,14 +479,14 @@ const emailService = {
 
 		}
 
-		const bouncedEmail = emailDataList.find(emailRow => emailRow.status === emailConst.status.BOUNCED);
+		const bouncedEmailList = emailDataList.filter(emailRow => emailRow.status === emailConst.status.BOUNCED);
 
 
 		let status = emailConst.status.DELIVERED;
 		let message = ''
 		//如果有拒收邮件，就把发件人的邮件改成拒收
-		if (bouncedEmail) {
-			const messageJson = { message: bouncedEmail.message };
+		if (bouncedEmailList.length > 0) {
+			const messageJson = { messages: bouncedEmailList.map(emailRow => emailRow.message) };
 			message = JSON.stringify(messageJson);
 			status = emailConst.status.BOUNCED;
 		}
@@ -486,6 +504,7 @@ const emailService = {
 		const { document } = parseHTML(content);
 
 		const images = Array.from(document.querySelectorAll('img'));
+		const ossDomain = domainUtils.toOssDomain(r2domain)
 
 		const useAtts = []
 
@@ -505,10 +524,8 @@ const emailService = {
 
 			}
 
-			r2domain = domainUtils.toOssDomain(r2domain)
-
-			if (src && src.startsWith(r2domain + '/')) {
-				img.setAttribute('src', src.replace(r2domain + '/', '{{domain}}'));
+			if (ossDomain && src && src.startsWith(ossDomain + '/')) {
+				img.setAttribute('src', src.replace(ossDomain + '/', '{{domain}}'));
 			}
 
 		}
@@ -560,13 +577,24 @@ const emailService = {
 
 	async physicsDelete(c, params) {
 		let { emailIds } = params;
-		emailIds = emailIds.split(',').map(Number);
+		if (!emailIds) {
+			return;
+		}
+		emailIds = emailIds.split(',').map(Number).filter(Number.isSafeInteger);
+		if (emailIds.length === 0) {
+			return;
+		}
 		await attService.removeByEmailIds(c, emailIds);
 		await starService.removeByEmailIds(c, emailIds);
 		await orm(c).delete(email).where(inArray(email.emailId, emailIds)).run();
 	},
 
 	async physicsDeleteUserIds(c, userIds) {
+		const emailRows = await orm(c).select({ emailId: email.emailId }).from(email).where(inArray(email.userId, userIds)).all();
+		const emailIds = emailRows.map(row => row.emailId);
+		if (emailIds.length > 0) {
+			await starService.removeByEmailIds(c, emailIds);
+		}
 		await attService.removeByUserIds(c, userIds);
 		await orm(c).delete(email).where(inArray(email.userId, userIds)).run();
 	},
@@ -801,18 +829,31 @@ const emailService = {
 		}
 
 		await attService.removeByEmailIds(c, emailIds);
+		await starService.removeByEmailIds(c, emailIds);
 
 		await orm(c).delete(email).where(conditions.length > 1 ? and(...conditions) : conditions[0]).run();
 	},
 
 	async physicsDeleteByAccountId(c, accountId) {
+		const emailRows = await orm(c).select({ emailId: email.emailId }).from(email).where(eq(email.accountId, accountId)).all();
+		const emailIds = emailRows.map(row => row.emailId);
+		if (emailIds.length > 0) {
+			await starService.removeByEmailIds(c, emailIds);
+		}
 		await attService.removeByAccountId(c, accountId);
 		await orm(c).delete(email).where(eq(email.accountId, accountId)).run();
 	},
 
 	async read(c, params, userId) {
 		const { emailIds } = params;
-		await orm(c).update(email).set({ unread: emailConst.unread.READ }).where(and(eq(email.userId, userId), inArray(email.emailId, emailIds)));
+		if (!Array.isArray(emailIds) || emailIds.length === 0) {
+			return;
+		}
+		const emailIdList = emailIds.map(Number).filter(Number.isSafeInteger);
+		if (emailIdList.length === 0) {
+			return;
+		}
+		await orm(c).update(email).set({ unread: emailConst.unread.READ }).where(and(eq(email.userId, userId), inArray(email.emailId, emailIdList))).run();
 	}
 };
 

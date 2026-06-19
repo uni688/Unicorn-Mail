@@ -5,7 +5,7 @@ export function allEmailList(params) {
 }
 
 export function allEmailDelete(emailIds) {
-    return http.delete('/allEmail/delete?emailIds=' + emailIds)
+    return http.delete('/allEmail/delete', {params: {emailIds}})
 }
 
 export function allEmailBatchDelete(params) {

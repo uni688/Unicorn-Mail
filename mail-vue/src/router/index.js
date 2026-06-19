@@ -108,7 +108,7 @@ router.beforeEach((to, from, next) => {
     }
 
     if (token && to.name === 'login') {
-        return next(from.path)
+        return next({path: '/inbox'})
     }
 
     next()
