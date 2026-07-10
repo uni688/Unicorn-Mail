@@ -31,9 +31,10 @@ crons = ["0 16 * * *"]	#定时任务每天晚上12点执行
 
 [vars]
 orm_log = false
-domain = ["zjx.me","谁用谁sb"]				#邮件域名可可配置多个 示例: ["example1.com","example2.com"]
-admin = "admin@zjx.me"				#管理员的邮箱	示例: admin@example.com
-jwt_secret = "Unicorn"			#jwt令牌的密钥,随便填一串字符串
+domain = ["example.com"]				#邮件域名可可配置多个 示例: ["example1.com","example2.com"]
+admin = "admin@example.com"				#管理员的邮箱	示例: admin@example.com
+cors_origins = "https://example.com"			#允许访问API的前端源，多个用英文逗号分隔
+# jwt_secret、init_secret、resend_webhook_secret 请使用 wrangler secret put 配置
 
 [build]
 command = "pnpm --prefix ../mail-vue install && pnpm --prefix ../mail-vue run build"

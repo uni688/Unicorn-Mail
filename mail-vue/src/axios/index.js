@@ -48,8 +48,7 @@ http.interceptors.response.use((res) => {
 
             } else if (data.code === 502) {
                 ElMessage({
-                    dangerouslyUseHTMLString: true,
-                    message: data.message,
+                    message: String(data.message || ''),
                     type: 'error',
                     plain: true,
                     grouping: true,

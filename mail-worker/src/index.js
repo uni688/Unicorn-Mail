@@ -5,6 +5,7 @@ import verifyRecordService from './service/verify-record-service';
 import emailService from './service/email-service';
 import r2Service from './service/r2-service';
 import oauthService from "./service/oauth-service";
+import result from './model/result';
 export default {
 	 async fetch(req, env, ctx) {
 
@@ -16,8 +17,15 @@ export default {
 			return app.fetch(req, env, ctx);
 		}
 
-		 if (['/static/','/attachments/'].some(p => url.pathname.startsWith(p))) {
-			 return await r2Service.toObjResp({ env }, url.pathname.substring(1));
+		 if (url.pathname.startsWith('/static/')) {
+			 try {
+				 return await r2Service.toObjResp({ env }, url.pathname.substring(1));
+			 } catch (err) {
+				 if (err.name !== 'BizError') {
+					 console.error(err);
+				 }
+				 return Response.json(result.fail(err.message, err.code));
+			 }
 		 }
 
 		return env.assets.fetch(req);

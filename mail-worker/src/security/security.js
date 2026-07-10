@@ -7,6 +7,7 @@ import userService from '../service/user-service';
 import permService from '../service/perm-service';
 import { t } from '../i18n/i18n'
 import app from '../hono/hono';
+import { isSameRoutePath } from '../utils/attachment-policy';
 
 const exclude = [
 	'/login',
@@ -130,7 +131,7 @@ app.use('*', async (c, next) => {
 	}
 
 	const permIndex = requirePerms.findIndex(item => {
-		return path.startsWith(item);
+		return isSameRoutePath(path, item);
 	});
 
 	if (permIndex > -1) {
@@ -140,7 +141,7 @@ app.use('*', async (c, next) => {
 		const userPaths = permKeyToPaths(permKeys);
 
 		const userPermIndex = userPaths.findIndex(item => {
-			return path.startsWith(item);
+			return isSameRoutePath(path, item);
 		});
 
 		if (userPermIndex === -1 && authInfo.user.email !== c.env.admin) {

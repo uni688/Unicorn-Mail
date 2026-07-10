@@ -4,13 +4,14 @@
 	"private": true,
 	"scripts": {
 		"dev": "wrangler dev --config wrangler-dev.toml",
-		"test": "wrangler deploy --config wrangler-test.toml",
+		"test": "vitest run --config vitest.unit.config.js",
+		"deploy:test": "wrangler deploy --config wrangler-test.toml",
 		"deploy": "wrangler deploy",
 		"start": "wrangler dev"
 	},
 	"devDependencies": {
 		"@cloudflare/vitest-pool-workers": "^0.7.5",
-		"vitest": "~4.1.0",
+		"vitest": "~3.0.5",
 		"wrangler": "^4.59.2"
 	},
 	"dependencies": {
@@ -23,6 +24,7 @@
 		"linkedom": "^0.18.10",
 		"postal-mime": "^2.4.3",
 		"resend": "^6.4.1",
+		"svix": "^1.76.1",
 		"ua-parser-js": "^2.0.10",
 		"uuid": "^14.0.0"
 	}
