@@ -13,15 +13,15 @@ app.onError((err, c) => {
 		console.error(err);
 	}
 
-	if (err.message === `Cannot read properties of undefined (reading 'get')`) {
+	if (!c.env.kv && err.message === `Cannot read properties of undefined (reading 'get')`) {
 		return c.json(result.fail('KV数据库未绑定 KV database not bound',502));
 	}
 
-	if (err.message === `Cannot read properties of undefined (reading 'put')`) {
+	if (!c.env.kv && err.message === `Cannot read properties of undefined (reading 'put')`) {
 		return c.json(result.fail('KV数据库未绑定 KV database not bound',502));
 	}
 
-	if (err.message === `Cannot read properties of undefined (reading 'prepare')`) {
+	if (!c.env.db && err.message === `Cannot read properties of undefined (reading 'prepare')`) {
 		return c.json(result.fail('D1数据库未绑定 D1 database not bound',502));
 	}
 

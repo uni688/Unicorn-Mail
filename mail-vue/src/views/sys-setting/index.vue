@@ -403,7 +403,7 @@
                 <span>{{ $t('community') }} : </span>
                 <div class="community">
                   <el-button @click="jump('https://github.com/uni688/Unicorn-Mail')">
-                    Github
+                    GitHub
                     <template #icon>
                       <Icon icon="codicon:github-inverted" width="22" height="22"/>
                     </template>

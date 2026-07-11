@@ -2,19 +2,26 @@ import { env, createExecutionContext, waitOnExecutionContext, SELF } from 'cloud
 import { describe, it, expect } from 'vitest';
 import worker from '../src';
 
-describe('Hello World worker', () => {
-	it('responds with Hello World! (unit style)', async () => {
+describe('Unicorn Mail worker', () => {
+	it('serves the frontend (unit style)', async () => {
 		const request = new Request('http://example.com');
-		// Create an empty context to pass to `worker.fetch()`.
 		const ctx = createExecutionContext();
 		const response = await worker.fetch(request, env, ctx);
-		// Wait for all `Promise`s passed to `ctx.waitUntil()` to settle before running test assertions
 		await waitOnExecutionContext(ctx);
-		expect(await response.text()).toMatchInlineSnapshot(`"Hello World!"`);
+		expect(response.status).toBe(200);
+		expect(await response.text()).toContain('<title>Unicorn Mail</title>');
 	});
 
-	it('responds with Hello World! (integration style)', async () => {
+	it('serves the frontend (integration style)', async () => {
 		const response = await SELF.fetch('http://example.com');
-		expect(await response.text()).toMatchInlineSnapshot(`"Hello World!"`);
+		expect(response.status).toBe(200);
+		expect(await response.text()).toContain('<title>Unicorn Mail</title>');
+	});
+
+	it('has a working KV namespace binding', async () => {
+		const key = `vitest-kv-${crypto.randomUUID()}`;
+		await env.kv.put(key, 'ok');
+		expect(await env.kv.get(key)).toBe('ok');
+		await env.kv.delete(key);
 	});
 });

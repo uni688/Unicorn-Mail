@@ -187,9 +187,12 @@ export async function email(message, env, ctx) {
 
 function checkBlock(blackSubjectStr, blackContentStr, blackFromStr, email) {
 
-	const blackFromList = blackFromStr ? blackFromStr.split(',') : []
-	const blackContentList = blackContentStr ? blackContentStr.split(',') : []
-	const blackSubjectList = blackSubjectStr ? blackSubjectStr.split(',') : []
+	const parseBlackList = value => value
+		? value.split(/[,，]/).map(item => item.trim()).filter(Boolean)
+		: [];
+	const blackFromList = parseBlackList(blackFromStr)
+	const blackContentList = parseBlackList(blackContentStr)
+	const blackSubjectList = parseBlackList(blackSubjectStr)
 
 	for (const blackSubject of blackSubjectList) {
 		if (email.subject?.includes(blackSubject)) {

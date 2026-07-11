@@ -57,7 +57,34 @@ const r2Service = {
 	},
 
 	async toObjResp(c, key) {
-		return await this.getObj(c, key);
+		const storageType = await this.storageType(c);
+
+		try {
+			const obj = await this.getObj(c, key);
+			if (!obj) {
+				return new Response('Not Found', { status: 404 });
+			}
+
+			if (obj instanceof Response) {
+				return obj;
+			}
+
+			if (storageType === 'R2') {
+				const headers = new Headers();
+				obj.writeHttpMetadata(headers);
+				if (obj.httpEtag) {
+					headers.set('ETag', obj.httpEtag);
+				}
+				return new Response(obj.body, { headers });
+			}
+
+			return new Response(obj);
+		} catch (error) {
+			if (error?.name === 'NoSuchKey' || error?.$metadata?.httpStatusCode === 404) {
+				return new Response('Not Found', { status: 404 });
+			}
+			throw error;
+		}
 	},
 
 	async delete(c, key) {
