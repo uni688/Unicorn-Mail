@@ -47,8 +47,6 @@ const jwtUtils = {
 	},
 
 	async verifyToken(c, token) {
-		if (!token) return null;
-
 		try {
 			const [headerB64, payloadB64, signatureB64] = token.split('.');
 
@@ -81,6 +79,7 @@ const jwtUtils = {
 			return payload;
 
 		} catch (err) {
+			console.log(err)
 			return null;
 		}
 	}

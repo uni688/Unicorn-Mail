@@ -10,7 +10,6 @@ import emailUtils from '../utils/email-utils';
 import roleService from '../service/role-service';
 import userService from '../service/user-service';
 import telegramService from '../service/telegram-service';
-import { assertAttachmentPolicy, assertMessageSize } from '../utils/attachment-policy';
 
 export async function email(message, env, ctx) {
 
@@ -36,13 +35,10 @@ export async function email(message, env, ctx) {
 
 		const reader = message.raw.getReader();
 		let content = '';
-		let messageSize = 0;
 
 		while (true) {
 			const { done, value } = await reader.read();
 			if (done) break;
-			messageSize += value.byteLength;
-			assertMessageSize(messageSize);
 			content += new TextDecoder().decode(value);
 		}
 
@@ -117,8 +113,6 @@ export async function email(message, env, ctx) {
 			}
 		}
 
-		assertAttachmentPolicy(attachments);
-
 		let emailRow = await emailService.receive({ env }, params, cidAttachments, r2Domain);
 
 		attachments.forEach(attachment => {
@@ -133,8 +127,6 @@ export async function email(message, env, ctx) {
 			}
 		} catch (e) {
 			console.error(e);
-			await emailService.completeReceive({ env }, emailConst.status.FAILED, emailRow.emailId);
-			throw e;
 		}
 
 		emailRow = await emailService.completeReceive({ env }, account ? emailConst.status.RECEIVE : emailConst.status.NOONE, emailRow.emailId);

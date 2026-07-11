@@ -9,24 +9,21 @@ import { parseHTML } from 'linkedom';
 import { v4 as uuidv4 } from 'uuid';
 import domainUtils from '../utils/domain-uitls';
 import settingService from "./setting-service";
-import { assertAttachmentPolicy, attachmentContentDisposition, sanitizeAttachmentName } from '../utils/attachment-policy';
 
 const attService = {
 
 	async addAtt(c, attachments) {
-		assertAttachmentPolicy(attachments);
 
 		for (let attachment of attachments) {
-			attachment.filename = sanitizeAttachmentName(attachment.filename);
 
 			let metadate = {
 				contentType: attachment.mimeType,
 			}
 
 			if (!attachment.contentId) {
-				metadate.contentDisposition = attachmentContentDisposition(attachment.filename)
+				metadate.contentDisposition = `attachment;filename=${attachment.filename}`
 			} else {
-				metadate.contentDisposition = attachmentContentDisposition(attachment.filename, true)
+				metadate.contentDisposition = `inline;filename=${attachment.filename}`
 				metadate.cacheControl = `max-age=259200`
 			}
 
@@ -145,7 +142,6 @@ const attService = {
 		const attDataList = [];
 
 		for (let att of attList) {
-			att.filename = sanitizeAttachmentName(att.filename);
 			att.buff = fileUtils.base64ToUint8Array(att.content);
 			att.key = constant.ATTACHMENT_PREFIX + await fileUtils.getBuffHash(att.buff) + fileUtils.getExtFileName(att.filename);
 			const attData = { userId, accountId, emailId };
@@ -157,24 +153,20 @@ const attService = {
 			attDataList.push(attData);
 		}
 
-		assertAttachmentPolicy(attDataList);
-
 		await orm(c).insert(att).values(attDataList).run();
 
 		for (let att of attList) {
 			await r2Service.putObj(c, att.key, att.buff, {
 				contentType: att.type,
-				contentDisposition: attachmentContentDisposition(att.filename)
+				contentDisposition: `attachment;filename=${att.filename}`
 			});
 		}
 
 	},
 
 	async saveArticleAtt(c, attDataList, userId, accountId, emailId) {
-		assertAttachmentPolicy(attDataList);
 
 		for (let attData of attDataList) {
-			attData.filename = sanitizeAttachmentName(attData.filename);
 			attData.userId = userId;
 			attData.emailId = emailId;
 			attData.accountId = accountId;
@@ -185,7 +177,7 @@ const attService = {
 			await r2Service.putObj(c, attData.key, attData.buff, {
 				contentType: attData.mimeType,
 				cacheControl: `max-age=259200`,
-				contentDisposition: attachmentContentDisposition(attData.filename, true)
+				contentDisposition: `inline;filename=${attData.filename}`
 			});
 			delete attData.buff;
 		}

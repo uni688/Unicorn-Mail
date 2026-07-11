@@ -1,27 +1,8 @@
 import emailService from './email-service';
 import { emailConst } from '../const/entity-const';
 import BizError from '../error/biz-error';
-import { Webhook } from 'svix';
-import { t } from '../i18n/i18n';
 
 const resendService = {
-
-	verifyWebhook(c, body) {
-		const secret = c.env.resend_webhook_secret;
-		if (!secret) {
-			throw new BizError(t('resendWebhookSecretMissing'), 500);
-		}
-
-		try {
-			return new Webhook(secret).verify(body, {
-				'svix-id': c.req.header('svix-id'),
-				'svix-timestamp': c.req.header('svix-timestamp'),
-				'svix-signature': c.req.header('svix-signature')
-			});
-		} catch (err) {
-			throw new BizError(t('resendWebhookInvalid'), 401);
-		}
-	},
 
 	async webhooks(c, body) {
 

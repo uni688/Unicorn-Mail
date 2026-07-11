@@ -235,7 +235,6 @@ import {useI18n} from "vue-i18n";
 import {EmailUnreadEnum} from "@/enums/email-enum.js";
 import { UseVirtualList } from '@vueuse/components'
 import { useScroll } from '@vueuse/core'
-import DOMPurify from 'dompurify'
 
 const props = defineProps({
   getEmailList: Function,
@@ -545,13 +544,8 @@ function htmlToText(email) {
   if (email.content) {
 
     const tempDiv = document.createElement('div');
-    const cleanHtml = DOMPurify.sanitize(email.content, {
-      USE_PROFILES: { html: true },
-      FORBID_TAGS: ['script', 'iframe', 'object', 'embed', 'form', 'input', 'button'],
-      ALLOW_DATA_ATTR: false
-    })
 
-    tempDiv.innerHTML = cleanHtml.replace(
+    tempDiv.innerHTML = email.content.replace(
         /<(img|iframe|object|embed|video|audio|source|link)[^>]*>/gi, ''
     );
 

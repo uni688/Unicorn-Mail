@@ -135,11 +135,14 @@ const publicService = {
 				type = roleRow ? roleRow.roleId : type;
 			}
 
-			userList.push(c.env.db.prepare(`INSERT INTO user (email, password, salt, type, os, browser, active_ip, create_ip, device, active_time, create_time)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).bind(email, hash, salt, type, os, browser, activeIp, activeIp, device, activeTime, activeTime));
+			const userSql = `INSERT INTO user (email, password, salt, type, os, browser, active_ip, create_ip, device, active_time, create_time)
+			VALUES ('${email}', '${hash}', '${salt}', '${type}', '${os}', '${browser}', '${activeIp}', '${activeIp}', '${device}', '${activeTime}', '${activeTime}')`
 
-			userList.push(c.env.db.prepare(`INSERT INTO account (email, name, user_id)
-			VALUES (?, ?, 0)`).bind(email, emailUtils.getName(email)));
+			const accountSql = `INSERT INTO account (email, name, user_id)
+			VALUES ('${email}', '${emailUtils.getName(email)}', 0);`;
+
+			userList.push(c.env.db.prepare(userSql));
+			userList.push(c.env.db.prepare(accountSql));
 
 		}
 
@@ -171,9 +174,6 @@ const publicService = {
 	async verifyUser(c, params) {
 
 		const { email, password } = params
-		if (!email || !password) {
-			throw new BizError(t('emailAndPwdEmpty'));
-		}
 
 		const userRow = await userService.selectByEmailIncludeDel(c, email);
 
