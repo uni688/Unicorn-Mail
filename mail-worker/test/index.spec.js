@@ -24,4 +24,23 @@ describe('Unicorn Mail worker', () => {
 		expect(await env.kv.get(key)).toBe('ok');
 		await env.kv.delete(key);
 	});
+
+	it('does not report a bound KV namespace as missing', async () => {
+		const response = await SELF.fetch('http://example.com/api/test');
+		const body = await response.text();
+
+		expect(body).not.toContain('KV数据库未绑定');
+		expect(body).not.toContain('KV database not bound');
+	});
+
+	it('reports a genuinely missing KV binding', async () => {
+		const request = new Request('http://example.com/api/test');
+		const ctx = createExecutionContext();
+		const response = await worker.fetch(request, { ...env, kv: undefined }, ctx);
+		await waitOnExecutionContext(ctx);
+		const body = await response.text();
+
+		expect(response.status).toBe(200);
+		expect(body).toContain('KV数据库未绑定 KV database not bound');
+	});
 });
