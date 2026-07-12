@@ -98,7 +98,23 @@ const s3Service = {
 	async getObj(c, key) {
 		const client = await this.client(c);
 		const { bucket } = await settingService.query(c);
-		return await client.send(new GetObjectCommand({ Bucket: bucket, Key: key }));
+		const result = await client.send(new GetObjectCommand({
+			Bucket: bucket,
+			Key: key
+		}));
+		const headers = new Headers({
+			'Content-Type': result.ContentType || 'application/octet-stream'
+		});
+		if (result.ContentDisposition) {
+			headers.set('Content-Disposition', result.ContentDisposition);
+		}
+		if (result.CacheControl) {
+			headers.set('Cache-Control', result.CacheControl);
+		}
+
+		return new Response(result.Body, {
+			headers
+		});
 	},
 
 

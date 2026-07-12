@@ -4,19 +4,6 @@ import kvObjService from './kv-obj-service';
 
 const r2Service = {
 
-	toRespHeaders(contentType, contentDisposition, cacheControl) {
-		const headers = {
-			'Content-Type': contentType || 'application/octet-stream'
-		};
-		if (contentDisposition) {
-			headers['Content-Disposition'] = contentDisposition;
-		}
-		if (cacheControl) {
-			headers['Cache-Control'] = cacheControl;
-		}
-		return headers;
-	},
-
 	async storageType(c) {
 
 		const setting = await settingService.query(c);
@@ -53,77 +40,51 @@ const r2Service = {
 
 	},
 
-	async getObj(c, key, storageType) {
-		storageType = storageType || await this.storageType(c);
+	async getObj(c, key) {
+		const storageType = await this.storageType(c);
+
 		if (storageType === 'KV') {
-			return await c.env.kv.getWithMetadata(key, { type: "arrayBuffer" });
+			return await kvObjService.getObj(c, key);
 		}
+
 		if (storageType === 'R2') {
 			return await c.env.r2.get(key);
 		}
-		return await s3Service.getObj(c, key);
+
+		if (storageType === 'S3') {
+			return await s3Service.getObj(c, key);
+		}
 	},
 
 	async toObjResp(c, key) {
 		const storageType = await this.storageType(c);
-		let obj;
+
 		try {
-			obj = await this.getObj(c, key, storageType);
+			const obj = await this.getObj(c, key);
+			if (!obj) {
+				return new Response('Not Found', { status: 404 });
+			}
+
+			if (obj instanceof Response) {
+				return obj;
+			}
+
+			if (storageType === 'R2') {
+				const headers = new Headers();
+				obj.writeHttpMetadata(headers);
+				if (obj.httpEtag) {
+					headers.set('ETag', obj.httpEtag);
+				}
+				return new Response(obj.body, { headers });
+			}
+
+			return new Response(obj);
 		} catch (error) {
 			if (error?.name === 'NoSuchKey' || error?.$metadata?.httpStatusCode === 404) {
 				return new Response('Not Found', { status: 404 });
 			}
 			throw error;
 		}
-
-		if (!obj) {
-			return new Response('Not Found', { status: 404 });
-		}
-
-		if (storageType === 'KV') {
-			if (obj.value == null) {
-				return new Response('Not Found', { status: 404 });
-			}
-			return new Response(obj.value, {
-				headers: this.toRespHeaders(
-					obj.metadata?.contentType,
-					obj.metadata?.contentDisposition,
-					obj.metadata?.cacheControl
-				)
-			});
-		}
-
-		if (storageType === 'R2') {
-			if (!obj.body) {
-				return new Response('Not Found', { status: 404 });
-			}
-			return new Response(obj.body, {
-				headers: this.toRespHeaders(
-					obj.httpMetadata?.contentType,
-					obj.httpMetadata?.contentDisposition,
-					obj.httpMetadata?.cacheControl
-				)
-			});
-		}
-
-		if (!obj.Body) {
-			return new Response('Not Found', { status: 404 });
-		}
-
-		let body = obj.Body;
-		if (typeof body.transformToWebStream === 'function') {
-			body = body.transformToWebStream();
-		} else if (typeof body.transformToByteArray === 'function') {
-			body = new Uint8Array(await body.transformToByteArray());
-		}
-
-		return new Response(body, {
-			headers: this.toRespHeaders(
-				obj.ContentType,
-				obj.ContentDisposition,
-				obj.CacheControl
-			)
-		});
 	},
 
 	async delete(c, key) {
