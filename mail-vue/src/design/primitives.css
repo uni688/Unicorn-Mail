@@ -1,0 +1,107 @@
+/* ============================================================================
+ * Layer 1 · Primitive
+ * 原始色阶 / 尺度 / 字体 / 动效常量。与主题无关。
+ * 业务代码禁止直接使用，只允许 tokens.css（Layer 2）引用。
+ * 参见 doc/UI-UX-Redesign-Proposal.md §4.1 §4.2 §4.3 §4.8 §4.9
+ * ==========================================================================*/
+
+:root {
+    /* --- Graphite（中性） ------------------------------------------------- */
+    --um-gray-0: #FFFFFF;
+    --um-gray-25: #FCFCFD;
+    --um-gray-50: #FAFAFB;
+    --um-gray-100: #F4F4F6;
+    --um-gray-200: #E8E8EC;
+    --um-gray-300: #D8D8DF;
+    --um-gray-400: #B4B4BF;
+    --um-gray-500: #8B8B99;
+    --um-gray-600: #63636E;
+    --um-gray-700: #46464F;
+    --um-gray-800: #2A2A31;
+    --um-gray-900: #1A1A1F;
+    --um-gray-950: #0A0A0B;
+
+    /* --- Violet（强调） --------------------------------------------------- */
+    --um-violet-50: #F5F2FF;
+    --um-violet-100: #EDE9FE;
+    --um-violet-200: #DDD6FE;
+    --um-violet-300: #C4B5FD;
+    --um-violet-400: #A48FFB;
+    --um-violet-500: #8B72F0;
+    /* 550 只为「深色实底 hover」而存在：600 是深色实底的静息态（白字 5.39:1），
+       再提亮一档才有 hover 反馈，但 550 上白字只有 4.37:1，故不可用作静息态。 */
+    --um-violet-550: #7C66DD;
+    --um-violet-600: #6E56CF;
+    --um-violet-700: #5B45B0;
+    --um-violet-800: #473688;
+    --um-violet-900: #332764;
+
+    /* --- 状态原色（浅色用 500/700/50，深色用 400/300 + 14% 底） ---------- */
+    --um-green-300: #7EDCA4;
+    --um-green-400: #3DBB70;
+    --um-green-500: #2E9E5B;
+    --um-green-700: #1F7444;
+    --um-green-50: #E8F6EE;
+    --um-green-rgb: 61 187 112;
+
+    --um-amber-300: #F3CE85;
+    --um-amber-400: #E0A32E;
+    --um-amber-500: #C77A0A;
+    --um-amber-700: #8F5606;
+    --um-amber-50: #FDF3E3;
+    --um-amber-rgb: 224 163 46;
+
+    --um-red-300: #FCA5A5;
+    --um-red-400: #F26D6D;
+    --um-red-500: #D64545;
+    --um-red-700: #A32E2E;
+    --um-red-50: #FDECEC;
+    --um-red-rgb: 242 109 109;
+
+    --um-cyan-300: #A5D8EC;
+    --um-cyan-400: #4CA6CE;
+    --um-cyan-500: #2E7DA6;
+    --um-cyan-700: #1F5C7D;
+    --um-cyan-50: #E9F4FA;
+    --um-cyan-rgb: 76 166 206;
+
+    /* --- 字体（§4.3；CJK 一律系统字体，不自托管） ------------------------ */
+    --um-font-sans: "InterVariable", Inter, -apple-system, BlinkMacSystemFont,
+    "Segoe UI Variable Text", "Segoe UI", "PingFang SC", "Hiragino Sans GB",
+    "Microsoft YaHei", "Noto Sans SC", sans-serif;
+    --um-font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, "SF Mono",
+    Menlo, Consolas, "Liberation Mono", monospace;
+    --um-font-feature: "cv05" 1, "cv11" 1, "ss03" 1;
+
+    /* --- 动效（§4.8，上限 320ms；主题切换 View Transition 520ms 为唯一例外） */
+    --um-dur-instant: 0ms;
+    --um-dur-fast: 120ms;
+    --um-dur-base: 180ms;
+    --um-dur-slow: 240ms;
+    --um-dur-sheet: 320ms;
+    --um-ease-standard: cubic-bezier(.2, 0, .2, 1);
+    --um-ease-out: cubic-bezier(0, 0, .2, 1);
+    --um-ease-in: cubic-bezier(.4, 0, 1, 1);
+
+    /* --- Z 分层（§4.9） -------------------------------------------------- */
+    --um-z-base: 0;
+    --um-z-sticky: 10;
+    --um-z-sidebar: 20;
+    --um-z-dropdown: 1000;
+    --um-z-overlay: 1100;
+    --um-z-dialog: 1200;
+    --um-z-popover: 1300;
+    --um-z-tooltip: 1400;
+    --um-z-toast: 1500;
+    --um-z-command: 1600;
+    --um-z-progress: 1700;
+
+    /* --- 圆角（§4.5） ---------------------------------------------------- */
+    --um-radius-xs: 4px;
+    --um-radius-sm: 6px;
+    --um-radius-md: 8px;
+    --um-radius-lg: 12px;
+    --um-radius-xl: 16px;
+    --um-radius-2xl: 20px;
+    --um-radius-full: 9999px;
+}

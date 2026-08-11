@@ -65,6 +65,13 @@ const routes = [
         component: () => import('@/views/test/index.vue')
     },
     {
+        // Design System 预览页：P0~P1 的人工过审入口，不读任何用户数据，故不走登录门禁
+        path: '/_ds',
+        name: 'design-system',
+        component: () => import('@/views/design-system/index.vue'),
+        meta: {public: true}
+    },
+    {
         path: '/:pathMatch(.*)*',
         name: '404',
         component: () => import('@/views/404/index.vue')
@@ -99,6 +106,10 @@ router.beforeEach((to, from, next) => {
     }
 
     const token = localStorage.getItem('token')
+
+    if (to.meta.public) {
+        return next()
+    }
 
     if (!token && to.name !== 'login') {
         return next({name: 'login'})

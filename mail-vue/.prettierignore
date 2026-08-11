@@ -1,0 +1,12 @@
+# 构建产物与依赖
+dist
+dev-dist
+node_modules
+pnpm-lock.yaml
+
+# 第三方静态资源（不参与格式化）
+public
+
+# 生成物
+*.min.js
+*.min.css

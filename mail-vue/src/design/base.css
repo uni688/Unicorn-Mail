@@ -1,0 +1,106 @@
+/* ============================================================================
+ * Base — reset / 字体 / focus-visible / 滚动条 / ::selection
+ * 全部放在 @layer base，保证 Tailwind 工具类与未迁移的旧样式都能覆盖它。
+ * 参见 doc/UI-UX-Redesign-Proposal.md §4.3 §4.7 §9.1
+ * ==========================================================================*/
+
+@layer base {
+    /* 让原生滚动条、表单控件、拼写下划线跟随「当前选择的主题」而非操作系统 */
+    :root {
+        color-scheme: light;
+    }
+
+    :root.dark {
+        color-scheme: dark;
+    }
+
+    html, body, #app {
+        width: 100%;
+        height: 100%;
+    }
+
+    body {
+        background: var(--um-bg-canvas);
+        color: var(--um-fg-default);
+        font-family: var(--um-font-sans);
+        font-feature-settings: var(--um-font-feature);
+        font-size: 0.875rem;
+        line-height: 1.25rem;
+        text-wrap: pretty;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+    }
+
+    h1, h2, h3, h4, h5, h6 {
+        text-wrap: balance;
+    }
+
+    /* --- Focus Ring（§4.7；取代原 style.css 的 *:focus{outline:none}） --- */
+    :focus-visible {
+        outline: var(--um-focus-ring-w) solid var(--um-border-focus);
+        outline-offset: var(--um-focus-ring-offset);
+        border-radius: inherit;
+    }
+
+    /* 鼠标点击不留环，键盘导航必留环 */
+    :focus:not(:focus-visible) {
+        outline: none;
+    }
+
+    /* --- 滚动条 --- */
+    * {
+        scrollbar-width: thin;
+        scrollbar-color: var(--um-border-strong) transparent;
+    }
+
+    ::-webkit-scrollbar {
+        width: 10px;
+        height: 10px;
+    }
+
+    ::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+    ::-webkit-scrollbar-thumb {
+        background: var(--um-border-strong);
+        border: 3px solid transparent;
+        border-radius: var(--um-radius-full);
+        background-clip: content-box;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+        background: var(--um-fg-subtle);
+        border: 3px solid transparent;
+        background-clip: content-box;
+    }
+
+    ::-webkit-scrollbar-corner {
+        background: transparent;
+    }
+
+    /* --- 选区 --- */
+    ::selection {
+        background: color-mix(in oklab, var(--um-accent-solid) 22%, transparent);
+        color: var(--um-fg-default);
+    }
+
+    /* --- 数字等宽：统计、配额、时间戳一律不跳字宽（§4.3 硬规则） --- */
+    .um-tnum, time, [data-tnum] {
+        font-variant-numeric: tabular-nums;
+    }
+
+    code, kbd, samp, pre {
+        font-family: var(--um-font-mono);
+    }
+
+    /* --- 减少动效（§8.4）：主题切换的 View Transition 也一并关掉 --- */
+    @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after {
+            animation-duration: 0.01ms !important;
+            animation-iteration-count: 1 !important;
+            transition-duration: 0.01ms !important;
+            scroll-behavior: auto !important;
+        }
+    }
+}

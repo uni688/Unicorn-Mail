@@ -1,0 +1,146 @@
+/* ============================================================================
+ * 过渡期兼容层（P6 阶段整文件删除）
+ * 把 Element Plus 变量与 36 个遗留自定义变量映射到新 token，
+ * 让「尚未重写的旧页面」在 P0 就换上新配色。
+ * 参见 doc/UI-UX-Redesign-Proposal.md §9.2 §10.4(P6)
+ *
+ * 选择器故意写成 :root:root / :root:root.dark：
+ *   :root:root      → (0,2,0) 压过 EP 的 :root (0,1,0)
+ *   :root:root.dark → (0,3,0) 压过 EP 的 html.dark (0,1,1)
+ * 这样无论 unplugin-vue-components 把 EP 组件样式注入到什么位置都能生效，
+ * 也就不再需要原 style.css 里那句 --el-border-color: … !important。
+ * ==========================================================================*/
+
+:root:root {
+    /* --- EP 主色 --- */
+    --el-color-primary: var(--um-accent-solid);
+    --el-color-primary-dark-2: var(--um-accent-active);
+    --el-color-primary-light-3: var(--um-violet-400);
+    --el-color-primary-light-5: var(--um-violet-300);
+    --el-color-primary-light-7: var(--um-violet-200);
+    --el-color-primary-light-8: var(--um-accent-border);
+    --el-color-primary-light-9: var(--um-accent-subtle-bg);
+
+    /* --- EP 状态色 --- */
+    --el-color-success: var(--um-success-solid);
+    --el-color-success-light-3: var(--um-success-solid);
+    --el-color-success-light-5: var(--um-success-subtle-fg);
+    --el-color-success-light-8: var(--um-success-subtle-bg);
+    --el-color-success-light-9: var(--um-success-subtle-bg);
+    --el-color-warning: var(--um-warning-solid);
+    --el-color-warning-light-3: var(--um-warning-solid);
+    --el-color-warning-light-5: var(--um-warning-subtle-fg);
+    --el-color-warning-light-8: var(--um-warning-subtle-bg);
+    --el-color-warning-light-9: var(--um-warning-subtle-bg);
+    --el-color-danger: var(--um-danger-solid);
+    --el-color-danger-light-3: var(--um-danger-solid);
+    --el-color-danger-light-5: var(--um-danger-subtle-fg);
+    --el-color-danger-light-8: var(--um-danger-subtle-bg);
+    --el-color-danger-light-9: var(--um-danger-subtle-bg);
+    --el-color-error: var(--um-danger-solid);
+    --el-color-error-light-3: var(--um-danger-solid);
+    --el-color-error-light-9: var(--um-danger-subtle-bg);
+    --el-color-info: var(--um-info-solid);
+    --el-color-info-light-3: var(--um-info-solid);
+    --el-color-info-light-5: var(--um-info-subtle-fg);
+    --el-color-info-light-8: var(--um-info-subtle-bg);
+    --el-color-info-light-9: var(--um-info-subtle-bg);
+
+    /* --- EP 背景 / 文字 / 描边 / 填充 --- */
+    --el-bg-color: var(--um-bg-canvas);
+    --el-bg-color-page: var(--um-bg-subtle);
+    --el-bg-color-overlay: var(--um-bg-raised);
+    --el-text-color-primary: var(--um-fg-default);
+    --el-text-color-regular: var(--um-fg-default);
+    --el-text-color-secondary: var(--um-fg-muted);
+    --el-text-color-placeholder: var(--um-fg-subtle);
+    --el-text-color-disabled: var(--um-fg-disabled);
+    --el-border-color: var(--um-border-default);
+    --el-border-color-light: var(--um-border-default);
+    --el-border-color-lighter: var(--um-border-default);
+    --el-border-color-extra-light: var(--um-border-default);
+    --el-border-color-dark: var(--um-border-strong);
+    --el-border-color-darker: var(--um-border-strong);
+    --el-border-color-hover: var(--um-border-strong);
+    --el-fill-color: var(--um-bg-inset);
+    --el-fill-color-light: var(--um-bg-inset);
+    --el-fill-color-lighter: var(--um-bg-subtle);
+    --el-fill-color-extra-light: var(--um-bg-subtle);
+    --el-fill-color-dark: var(--um-bg-hover);
+    --el-fill-color-darker: var(--um-bg-active);
+    --el-fill-color-blank: var(--um-bg-surface);
+    --el-mask-color: color-mix(in oklab, var(--um-bg-canvas) 90%, transparent);
+    --el-mask-color-extra-light: color-mix(in oklab, var(--um-bg-canvas) 30%, transparent);
+    --el-disabled-bg-color: var(--um-bg-inset);
+    --el-disabled-text-color: var(--um-fg-disabled);
+    --el-disabled-border-color: var(--um-border-default);
+
+    /* --- EP 圆角 / 阴影，对齐 §4.5 §4.6 --- */
+    --el-border-radius-base: var(--um-radius-md);
+    --el-border-radius-small: var(--um-radius-sm);
+    --el-border-radius-round: var(--um-radius-full);
+    --el-box-shadow: var(--um-shadow-md);
+    --el-box-shadow-light: var(--um-shadow-sm);
+    --el-box-shadow-lighter: var(--um-shadow-xs, var(--um-shadow-sm));
+    --el-box-shadow-dark: var(--um-shadow-lg);
+
+    /* --- 遗留自定义变量（含 2 处原始拼写错误，保留到 P6） --- */
+    --extra-light-fill: var(--um-bg-subtle);
+    --light-ill: var(--um-bg-inset);
+    --light-border: var(--um-border-default);
+    --light-border-color: var(--um-border-default);
+    --base-border-color: var(--um-border-strong);
+    --dark-border: var(--um-border-strong);
+    --base-fill: var(--um-bg-hover);
+    --header-actions-border: inset 0 -1px 0 0 var(--um-border-default);
+
+    /* 侧栏由深蓝 #001529 改为浅色 sidebar-bg，并去掉那道 3px 深蓝投影（§4.6） */
+    --aside-backgound: var(--um-sidebar-bg);
+    --aside-right-border: var(--um-shadow-lg);
+
+    --loadding-background: color-mix(in oklab, var(--um-bg-canvas) 80%, transparent);
+    --regular-text-color: var(--um-fg-muted);
+    --secondary-text-color: var(--um-fg-subtle);
+    --form-desc-color: var(--um-fg-muted);
+    --email-scroll-content-color: var(--um-fg-muted);
+    --email-hover-background: var(--um-bg-hover);
+    --choose-account-background: var(--um-bg-selected);
+    --login-switch-color: var(--um-accent-solid);
+    --login-border: 1px solid var(--um-border-default);
+    --scrollbar-track-color: var(--um-border-strong);
+    --scrollbar-thumb-color: var(--um-border-strong);
+    --message-block-color: rgb(0 0 0 / 0);
+    --loading-hide-transition: all 200ms;
+}
+
+:root:root.dark {
+    /* 深色下 EP 的几个派生色不能沿用浅色阶梯 */
+    --el-color-primary-light-3: var(--um-violet-500);
+    --el-color-primary-light-5: var(--um-accent-border);
+    --el-color-primary-light-7: var(--um-accent-subtle-bg);
+    --el-color-primary-light-8: var(--um-accent-subtle-bg);
+    --el-color-primary-light-9: var(--um-accent-subtle-bg);
+    --message-block-color: rgb(30 30 30 / .2);
+}
+
+/* ----------------------------------------------------------------------------
+ * 输入框聚焦态（§4.7）：EP 自带 1px 蓝边，这里换成 accent 边 + 3px 光晕；
+ * 同时抑制内层 <input> 的全局 focus 环，避免出现双重环。
+ * 特异性刻意做到 (0,3,0)，不用 !important。
+ * --------------------------------------------------------------------------*/
+.el-input .el-input__inner:focus-visible,
+.el-textarea .el-textarea__inner:focus-visible,
+.el-select .el-select__wrapper:focus-visible {
+    outline: none;
+}
+
+.el-input .el-input__wrapper.is-focus,
+.el-select .el-select__wrapper.is-focused {
+    box-shadow: 0 0 0 1px var(--um-accent-solid) inset,
+    0 0 0 3px var(--um-accent-ring);
+}
+
+.el-textarea .el-textarea__inner:focus {
+    box-shadow: 0 0 0 1px var(--um-accent-solid) inset,
+    0 0 0 3px var(--um-accent-ring);
+}

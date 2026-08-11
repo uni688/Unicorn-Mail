@@ -1,0 +1,17 @@
+/* ============================================================================
+ * Design System 入口 — 由 main.js 唯一引入
+ * 层次：Tailwind(theme/preflight/utilities) → Primitive → Semantic/Component
+ *       → Base → EP 兼容层 → 主题切换动画
+ * 参见 doc/UI-UX-Redesign-Proposal.md §9.2 §10.3
+ * ==========================================================================*/
+
+@import "tailwindcss";
+@import "./primitives.css";
+@import "./tokens.css";
+@import "./base.css";
+@import "./compat-ep.css";
+@import "./view-transition.css";
+
+/* 显式声明扫描范围，不依赖自动探测（CSS 位于 src/design/ 下） */
+@source "../../index.html";
+@source "../**/*.{vue,js,ts}";

@@ -5,7 +5,7 @@
         <Icon icon="mdi:email-outline" width="24" height="24" />
         <div>{{settingStore.settings.title}}</div>
       </div>
-      <el-menu :collapse="false" text-color="#fff" active-text-color="#fff" style="margin-top: 10px">
+      <el-menu :collapse="false" text-color="var(--um-sidebar-fg)" active-text-color="var(--um-accent-fg)" style="margin-top: 10px">
         <el-menu-item @click="router.push({name: 'email'})" index="email"
                       :class="route.meta.name === 'email' ? 'choose-item' : ''">
           <Icon icon="hugeicons:mailbox-01" width="20" height="20" />
@@ -124,7 +124,8 @@ const route = useRoute();
 .manage-title {
   margin-top: 10px;
   padding-left: 20px;
-  color: #fff;
+  /* 侧栏改浅色后白字会看不见，改用语义 token（P2 重写侧栏时整体替换） */
+  color: var(--um-fg-muted);
 }
 
 .el-menu-item {
@@ -136,13 +137,15 @@ const route = useRoute();
 
 .choose-item {
   font-weight: bold;
-  background: rgba(255, 255, 255, 0.08) !important;
+  /* 选中态：紫罗兰淡底 + accent 文字（旧的 rgba(255,255,255,.08) 在浅色侧栏上看不出来） */
+  color: var(--um-accent-fg);
+  background: var(--um-bg-selected) !important;
   backdrop-filter: blur(4px);
 }
 
 @media (hover: hover) {
   .el-menu-item:hover {
-    background: rgba(255, 255, 255, 0.08) !important;
+    background: var(--um-bg-hover) !important;
   }
 }
 
@@ -170,7 +173,7 @@ const route = useRoute();
 
 :deep(.el-divider__text) {
   background: var(--aside-backgound);
-  color: #FFFFFF;
+  color: var(--um-fg-muted);
 }
 
 .scroll {

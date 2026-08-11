@@ -1,0 +1,28 @@
+{
+  "semi": false,
+  "singleQuote": true,
+  "printWidth": 110,
+  "tabWidth": 4,
+  "bracketSpacing": false,
+  "vueIndentScriptAndStyle": false,
+  "endOfLine": "lf",
+  "overrides": [
+    {
+      "files": "*.vue",
+      "options": {
+        "tabWidth": 2
+      }
+    },
+    {
+      "files": [
+        "*.json",
+        "*.md",
+        "*.yaml",
+        "*.yml"
+      ],
+      "options": {
+        "tabWidth": 2
+      }
+    }
+  ]
+}

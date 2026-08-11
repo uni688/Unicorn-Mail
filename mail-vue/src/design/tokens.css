@@ -1,0 +1,359 @@
+/* ============================================================================
+ * Layer 2 · Semantic（主题切换只改这一层）
+ * Layer 3 · Component（组件消费，供站长级定制覆盖）
+ * 参见 doc/UI-UX-Redesign-Proposal.md §4.2 §4.4 §4.6 §4.12 §9.2 §10.3
+ *
+ * 用 `@theme inline` 而非 `@theme`：inline 会把 var(--um-*) 直接内联进工具类，
+ * 因此即使将来在某个子容器上加 .dark 也能正确解析，不依赖在 :root 上求值。
+ * ==========================================================================*/
+
+@theme inline {
+    /* --- 背景 --- */
+    --color-canvas: var(--um-bg-canvas);
+    --color-subtle: var(--um-bg-subtle);
+    --color-surface: var(--um-bg-surface);
+    --color-raised: var(--um-bg-raised);
+    --color-inset: var(--um-bg-inset);
+    --color-hover: var(--um-bg-hover);
+    --color-active: var(--um-bg-active);
+    --color-selected: var(--um-bg-selected);
+    --color-overlay: var(--um-bg-overlay);
+
+    /* --- 前景 --- */
+    --color-fg: var(--um-fg-default);
+    --color-fg-muted: var(--um-fg-muted);
+    --color-fg-subtle: var(--um-fg-subtle);
+    --color-fg-disabled: var(--um-fg-disabled);
+    --color-on-accent: var(--um-fg-on-accent);
+
+    /* --- 描边（border-line / border-line-strong / outline-focus） --- */
+    --color-line: var(--um-border-default);
+    --color-line-strong: var(--um-border-strong);
+    --color-focus: var(--um-border-focus);
+
+    /* --- 强调 --- */
+    --color-accent: var(--um-accent-solid);
+    --color-accent-hover: var(--um-accent-hover);
+    --color-accent-active: var(--um-accent-active);
+    --color-accent-fg: var(--um-accent-fg);
+    --color-accent-subtle: var(--um-accent-subtle-bg);
+    --color-accent-subtle-fg: var(--um-accent-subtle-fg);
+    --color-accent-line: var(--um-accent-border);
+
+    /* --- 状态 --- */
+    --color-success: var(--um-success-solid);
+    --color-success-subtle: var(--um-success-subtle-bg);
+    --color-success-fg: var(--um-success-subtle-fg);
+    --color-warning: var(--um-warning-solid);
+    --color-warning-subtle: var(--um-warning-subtle-bg);
+    --color-warning-fg: var(--um-warning-subtle-fg);
+    --color-danger: var(--um-danger-solid);
+    --color-danger-subtle: var(--um-danger-subtle-bg);
+    --color-danger-fg: var(--um-danger-subtle-fg);
+    --color-info: var(--um-info-solid);
+    --color-info-subtle: var(--um-info-subtle-bg);
+    --color-info-fg: var(--um-info-subtle-fg);
+
+    /* --- 侧栏（不再是深蓝） --- */
+    --color-sidebar: var(--um-sidebar-bg);
+    --color-sidebar-fg: var(--um-sidebar-fg);
+    --color-sidebar-indicator: var(--um-sidebar-indicator);
+
+    /* --- 数据可视化 6 系列（色盲可辨，非彩虹） --- */
+    --color-chart-1: var(--um-chart-1);
+    --color-chart-2: var(--um-chart-2);
+    --color-chart-3: var(--um-chart-3);
+    --color-chart-4: var(--um-chart-4);
+    --color-chart-5: var(--um-chart-5);
+    --color-chart-6: var(--um-chart-6);
+
+    /* --- 字体 --- */
+    --font-sans: var(--um-font-sans);
+    --font-mono: var(--um-font-mono);
+
+    /* --- 阴影（浅色靠阴影分层，深色 alpha ×2.5 + 上缘高光） --- */
+    --shadow-xs: var(--um-shadow-xs);
+    --shadow-sm: var(--um-shadow-sm);
+    --shadow-md: var(--um-shadow-md);
+    --shadow-lg: var(--um-shadow-lg);
+    --shadow-xl: var(--um-shadow-xl);
+}
+
+@theme {
+    /* --- 圆角（§4.5，覆盖 Tailwind 默认阶梯） --- */
+    --radius-xs: 4px;
+    --radius-sm: 6px;
+    --radius-md: 8px;
+    --radius-lg: 12px;
+    --radius-xl: 16px;
+    --radius-2xl: 20px;
+
+    /* --- Type scale（§4.3，基准 14px，密度导向） --- */
+    --text-display: 1.75rem;
+    --text-display--line-height: 2.125rem;
+    --text-display--font-weight: 600;
+    --text-display--letter-spacing: -0.02em;
+    --text-title-lg: 1.25rem;
+    --text-title-lg--line-height: 1.75rem;
+    --text-title-lg--font-weight: 600;
+    --text-title-lg--letter-spacing: -0.015em;
+    --text-title: 1rem;
+    --text-title--line-height: 1.5rem;
+    --text-title--font-weight: 600;
+    --text-title--letter-spacing: -0.01em;
+    --text-body-lg: 0.9375rem;
+    --text-body-lg--line-height: 1.5rem;
+    --text-body: 0.875rem;
+    --text-body--line-height: 1.25rem;
+    --text-body-strong: 0.875rem;
+    --text-body-strong--line-height: 1.25rem;
+    --text-body-strong--font-weight: 550;
+    --text-label: 0.8125rem;
+    --text-label--line-height: 1.125rem;
+    --text-label--font-weight: 500;
+    --text-caption: 0.75rem;
+    --text-caption--line-height: 1rem;
+    --text-caption--font-weight: 450;
+    --text-micro: 0.6875rem;
+    --text-micro--line-height: 0.875rem;
+    --text-micro--font-weight: 550;
+    --text-micro--letter-spacing: 0.04em;
+    --text-mono: 0.78125rem;
+    --text-mono--line-height: 1.125rem;
+    --text-mono--font-weight: 450;
+
+    /* --- 断点收敛为 5 个（§4.4，与 useBreakpoint() 保持同源） --- */
+    --breakpoint-sm: 640px;
+    --breakpoint-md: 768px;
+    --breakpoint-lg: 1024px;
+    --breakpoint-xl: 1280px;
+    --breakpoint-2xl: 1536px;
+
+    /* --- 动效（§4.8） --- */
+    --ease-standard: cubic-bezier(.2, 0, .2, 1);
+    --ease-out: cubic-bezier(0, 0, .2, 1);
+    --ease-in: cubic-bezier(.4, 0, 1, 1);
+    --default-transition-duration: 120ms;
+    --default-transition-timing-function: cubic-bezier(.2, 0, .2, 1);
+}
+
+/* Tailwind v4 深色变体：类名挂在 <html> 上，不使用 media 查询 */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ============================================================================
+ * Semantic — Light
+ * ==========================================================================*/
+:root {
+    /* 背景 */
+    --um-bg-canvas: var(--um-gray-0);
+    --um-bg-subtle: var(--um-gray-50);
+    --um-bg-surface: var(--um-gray-0);
+    --um-bg-raised: var(--um-gray-0);
+    --um-bg-inset: var(--um-gray-100);
+    --um-bg-hover: rgb(10 10 11 / .04);
+    --um-bg-active: rgb(10 10 11 / .07);
+    --um-bg-selected: rgb(110 86 207 / .07);
+    --um-bg-overlay: rgb(10 10 11 / .32);
+
+    /* 前景 */
+    --um-fg-default: var(--um-gray-900);
+    --um-fg-muted: var(--um-gray-600);
+    --um-fg-subtle: var(--um-gray-500);
+    --um-fg-disabled: var(--um-gray-400);
+    --um-fg-on-accent: var(--um-gray-0);
+
+    /* 描边 */
+    --um-border-default: var(--um-gray-200);
+    --um-border-strong: var(--um-gray-300);
+    --um-border-focus: var(--um-violet-600);
+
+    /* 强调（实底的 hover/active 朝「远离表面」走：浅色越按越深） */
+    --um-accent-solid: var(--um-violet-600);
+    --um-accent-hover: var(--um-violet-700);
+    --um-accent-active: var(--um-violet-800);
+    /* accent 当「文字/链接/图标」色时用这个，不要用 accent-solid：
+       solid 只保证「白字压在它上面」达标，不保证「它压在底色上」达标。 */
+    --um-accent-fg: var(--um-violet-700);
+    --um-accent-subtle-bg: var(--um-violet-50);
+    --um-accent-subtle-fg: var(--um-violet-700);
+    --um-accent-border: var(--um-violet-200);
+    --um-accent-ring: rgb(110 86 207 / .12);
+
+    /* 侧栏 */
+    --um-sidebar-bg: var(--um-gray-50);
+    --um-sidebar-fg: var(--um-gray-700);
+    --um-sidebar-indicator: var(--um-violet-600);
+
+    /* 状态 */
+    --um-success-solid: var(--um-green-500);
+    --um-success-subtle-bg: var(--um-green-50);
+    --um-success-subtle-fg: var(--um-green-700);
+    --um-warning-solid: var(--um-amber-500);
+    --um-warning-subtle-bg: var(--um-amber-50);
+    --um-warning-subtle-fg: var(--um-amber-700);
+    --um-danger-solid: var(--um-red-500);
+    --um-danger-subtle-bg: var(--um-red-50);
+    --um-danger-subtle-fg: var(--um-red-700);
+    --um-info-solid: var(--um-cyan-500);
+    --um-info-subtle-bg: var(--um-cyan-50);
+    --um-info-subtle-fg: var(--um-cyan-700);
+
+    /* 图表 */
+    --um-chart-1: #6E56CF;
+    --um-chart-2: #2E9E5B;
+    --um-chart-3: #C77A0A;
+    --um-chart-4: #2E7DA6;
+    --um-chart-5: #9E4B8C;
+    --um-chart-6: #8B8B99;
+
+    /* 阴影（§4.6） */
+    --um-shadow-xs: 0 1px 2px rgb(10 10 11 / .04);
+    --um-shadow-sm: 0 1px 2px rgb(10 10 11 / .05), 0 1px 3px rgb(10 10 11 / .04);
+    --um-shadow-md: 0 2px 4px -1px rgb(10 10 11 / .05), 0 4px 12px -2px rgb(10 10 11 / .06);
+    --um-shadow-lg: 0 2px 6px -2px rgb(10 10 11 / .06), 0 8px 24px -6px rgb(10 10 11 / .10);
+    --um-shadow-xl: 0 8px 16px -8px rgb(10 10 11 / .08), 0 24px 48px -12px rgb(10 10 11 / .16);
+
+    /* 玻璃（§4.12；只允许 GlassCard / Overlay 读取） */
+    --um-glass-alpha: 0.72;
+    --um-glass-bg: rgb(255 255 255 / var(--um-glass-alpha));
+    --um-glass-blur: 20px;
+    --um-glass-saturate: 160%;
+    --um-glass-border: rgb(255 255 255 / 0.60);
+    --um-glass-highlight: rgb(255 255 255 / 0.50);
+    --um-glass-shadow: 0 24px 64px -24px rgb(16 16 20 / 0.24);
+
+    /* 粒子与柔光（§4.12 / §8.5；只允许 ParticleField 读取。没有连线 token） */
+    --um-particle-color: 110 86 207;
+    --um-particle-alpha: 0.08;
+    --um-glow-from: rgb(110 86 207 / 0.06);
+    --um-glow-dots: rgb(110 86 207 / 0.03);
+}
+
+/* ============================================================================
+ * Semantic — Dark（选择器用 :root.dark，特异性 (0,2,0) 高于 Element Plus 的
+ * html.dark (0,1,1)，因此无需 !important 也能压过 EP 的深色变量表）
+ * ==========================================================================*/
+:root.dark {
+    --um-bg-canvas: #0A0A0B;
+    --um-bg-subtle: #101012;
+    --um-bg-surface: #141416;
+    --um-bg-raised: #1A1A1D;
+    --um-bg-inset: #0F0F11;
+    --um-bg-hover: rgb(255 255 255 / .05);
+    --um-bg-active: rgb(255 255 255 / .08);
+    --um-bg-selected: rgb(124 102 221 / .14);
+    --um-bg-overlay: rgb(0 0 0 / .60);
+
+    --um-fg-default: #ECECEF;
+    --um-fg-muted: #9C9CA6;
+    --um-fg-subtle: #6E6E78;
+    --um-fg-disabled: #4A4A52;
+    --um-fg-on-accent: #FFFFFF;
+
+    --um-border-default: #26262B;
+    --um-border-strong: #35353C;
+    --um-border-focus: var(--um-violet-500);
+
+    /* 深色的 accent 阶梯朝「提亮」走（同样是远离表面），但静息态仍是 violet-600：
+       白字压在 violet-600 上 5.39:1（AA 通过），压在 violet-550 上只有 4.37:1，
+       所以 550/500 只能当 hover/active 这种瞬时态。 */
+    --um-accent-solid: var(--um-violet-600);
+    --um-accent-hover: var(--um-violet-550);
+    --um-accent-active: var(--um-violet-500);
+    --um-accent-fg: var(--um-violet-500);
+    --um-accent-subtle-bg: rgb(110 86 207 / .14);
+    --um-accent-subtle-fg: var(--um-violet-300);
+    --um-accent-border: rgb(110 86 207 / .32);
+    --um-accent-ring: rgb(124 102 221 / .22);
+
+    --um-sidebar-bg: #0D0D0F;
+    --um-sidebar-fg: var(--um-fg-muted);
+    --um-sidebar-indicator: var(--um-violet-500);
+
+    --um-success-solid: var(--um-green-400);
+    --um-success-subtle-bg: rgb(var(--um-green-rgb) / .14);
+    --um-success-subtle-fg: var(--um-green-300);
+    --um-warning-solid: var(--um-amber-400);
+    --um-warning-subtle-bg: rgb(var(--um-amber-rgb) / .14);
+    --um-warning-subtle-fg: var(--um-amber-300);
+    --um-danger-solid: var(--um-red-400);
+    --um-danger-subtle-bg: rgb(var(--um-red-rgb) / .14);
+    --um-danger-subtle-fg: var(--um-red-300);
+    --um-info-solid: var(--um-cyan-400);
+    --um-info-subtle-bg: rgb(var(--um-cyan-rgb) / .14);
+    --um-info-subtle-fg: var(--um-cyan-300);
+
+    /* 图表：统一提亮一档 */
+    --um-chart-1: #8B72F0;
+    --um-chart-2: #3DBB70;
+    --um-chart-3: #E0A32E;
+    --um-chart-4: #4CA6CE;
+    --um-chart-5: #C06FAD;
+    --um-chart-6: #9C9CA6;
+
+    /* 深色不用 shadow-xs；其余几何相同、alpha ×2.5，并叠加上缘高光 */
+    --um-shadow-xs: none;
+    --um-shadow-sm: 0 1px 2px rgb(0 0 0 / .32), 0 1px 3px rgb(0 0 0 / .26),
+    inset 0 1px 0 rgb(255 255 255 / .04);
+    --um-shadow-md: 0 2px 4px -1px rgb(0 0 0 / .32), 0 4px 12px -2px rgb(0 0 0 / .38),
+    inset 0 1px 0 rgb(255 255 255 / .04);
+    --um-shadow-lg: 0 2px 6px -2px rgb(0 0 0 / .38), 0 8px 24px -6px rgb(0 0 0 / .50),
+    inset 0 1px 0 rgb(255 255 255 / .04);
+    --um-shadow-xl: 0 8px 16px -8px rgb(0 0 0 / .50), 0 24px 48px -12px rgb(0 0 0 / .64),
+    inset 0 1px 0 rgb(255 255 255 / .04);
+
+    --um-glass-alpha: 0.64;
+    --um-glass-bg: rgb(20 20 22 / var(--um-glass-alpha));
+    --um-glass-blur: 24px;
+    --um-glass-saturate: 140%;
+    --um-glass-border: rgb(255 255 255 / 0.08);
+    --um-glass-highlight: rgb(255 255 255 / 0.06);
+    --um-glass-shadow: 0 24px 64px -24px rgb(0 0 0 / 0.64);
+
+    --um-particle-color: 169 160 255;
+    --um-particle-alpha: 0.14;
+    --um-glow-from: rgb(110 86 207 / 0.05);
+    --um-glow-dots: rgb(255 255 255 / 0.03);
+}
+
+/* 无 backdrop-filter 时退化为近实色卡片，不做任何 JS 检测（§4.12） */
+@supports not (backdrop-filter: blur(1px)) {
+    :root {
+        --um-glass-alpha: 0.96;
+    }
+
+    :root.dark {
+        --um-glass-alpha: 0.94;
+    }
+}
+
+/* ============================================================================
+ * Layer 3 · Component（布局尺度 · §4.4；站长级定制覆盖这一层）
+ * ==========================================================================*/
+:root {
+    --um-sidebar-w: 248px;
+    --um-sidebar-w-collapsed: 56px;
+    --um-list-col-w: 380px;
+    --um-picker-min-w: 320px;
+    --um-topbar-h: 48px;
+    --um-row-h: 44px;
+    --um-row-h-compact: 36px;
+    --um-read-max-w: 720px;
+    --um-form-max-w: 1280px;
+    --um-page-px: 24px;
+    --um-card-p: 20px;
+    --um-focus-ring-w: 2px;
+    --um-focus-ring-offset: 2px;
+}
+
+@media (min-width: 1440px) {
+    :root {
+        --um-list-col-w: 400px;
+    }
+}
+
+@media (max-width: 767px) {
+    :root {
+        --um-page-px: 16px;
+    }
+}

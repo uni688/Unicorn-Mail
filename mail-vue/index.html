@@ -3,22 +3,39 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <meta name="theme-color" content="#F1F1F1" id="theme-color-meta">
+  <meta name="theme-color" content="#FAFAFB" id="theme-color-meta">
   <meta name="description" content="Unicorn Mail 是一个 Serverless 响应式邮箱服务，支持邮件发送，可部署到 Cloudflare 平台，降低服务器成本。Unicorn Mail is a serverless responsive email service that supports email sending and can be deployed on Cloudflare to reduce server costs.">
   <title>Unicorn Mail</title>
   <link rel="icon" href="/public/mail.png" type="image/png">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
   <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
   <script>
-    const uiStoreStr =  localStorage.getItem('ui')
-    if (uiStoreStr) {
-      const uiStore =  JSON.parse(uiStoreStr)
-      const root = document.documentElement
-      root.setAttribute('class', uiStore.dark ? 'dark' : '');
-      const metaTag = document.getElementById('theme-color-meta');
-      const isMobile =  !window.matchMedia("(pointer: fine) and (hover: hover)").matches;
-      metaTag.setAttribute('content', uiStore.dark ? (isMobile ? '#141414' : '#000000') : (isMobile ? '#FFFFFF' : '#F1F1F1'));
-    }
+    /* 防闪白：在 CSS 之前同步写好主题（§9.1）。
+       颜色常量与 src/composables/useTheme.js 的 THEME_COLOR 保持一致，改一处要改两处。 */
+    (function () {
+      var root = document.documentElement;
+      var mode = localStorage.getItem('um-theme');
+      if (mode !== 'light' && mode !== 'dark' && mode !== 'system') {
+        // 迁移旧的 pinia 持久化值
+        try {
+          var legacy = JSON.parse(localStorage.getItem('ui') || 'null');
+          mode = legacy && typeof legacy.dark === 'boolean' ? (legacy.dark ? 'dark' : 'light') : 'system';
+        } catch (e) {
+          mode = 'system';
+        }
+      }
+      var dark = mode === 'system'
+          ? window.matchMedia('(prefers-color-scheme: dark)').matches
+          : mode === 'dark';
+
+      root.classList.toggle('dark', dark);
+      root.dataset.theme = dark ? 'dark' : 'light';
+      root.dataset.themeMode = mode;
+
+      var isMobile = !window.matchMedia('(pointer: fine) and (hover: hover)').matches;
+      document.getElementById('theme-color-meta')
+          .setAttribute('content', dark ? (isMobile ? '#0A0A0B' : '#101012') : (isMobile ? '#FFFFFF' : '#FAFAFB'));
+    })();
   </script>
 </head>
 <style>
@@ -26,7 +43,7 @@
     background: #FFFFFF;
   }
   .dark {
-    background: #141414;
+    background: #0A0A0B;
   }
   #loading-first {
     position: fixed;
@@ -38,7 +55,7 @@
     justify-content: center;
     align-items: center;
     z-index: 500;
-    background: var(--el-bg-color);
+    background: var(--um-bg-canvas, #FFFFFF);
   }
 
   .loading-hide {
@@ -66,7 +83,7 @@
     height: 4px;
     overflow: hidden;
     border-radius: 999px;
-    background: rgba(64, 158, 255, 0.18);
+    background: rgba(110, 86, 207, 0.16);
   }
 
   .loading-progress::before {
@@ -77,7 +94,7 @@
     width: 100%;
     height: 100%;
     border-radius: inherit;
-    background: #409EFF;
+    background: #6E56CF;
     transform: scaleX(0);
     transform-origin: left center;
     animation: loading-progress-grow 2.4s linear forwards;
@@ -90,7 +107,7 @@
     width: 24px;
     height: 100%;
     border-radius: inherit;
-    background: rgba(64, 158, 255, 0.45);
+    background: rgba(110, 86, 207, 0.45);
     filter: blur(4px);
     transform: translateX(-24px);
     animation: loading-progress-peg 2.4s linear forwards;
