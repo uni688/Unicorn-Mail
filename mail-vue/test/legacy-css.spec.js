@@ -1,3 +1,6 @@
+// @vitest-environment node
+// 纯静态文件断言，不需要 DOM。全局环境在 P1 切成了 jsdom，
+// 而 jsdom 下的 URL 实现会让 fileURLToPath(import.meta.url) 失效，所以这里单独退回 node。
 import {readFileSync, readdirSync} from 'node:fs'
 import {extname, join} from 'node:path'
 import {fileURLToPath} from 'node:url'
@@ -110,9 +113,11 @@ describe('CSS 自定义属性完整性', () => {
             }
         }
 
-        // Element Plus 自带的变量表由 EP 的 CSS 提供，不在本仓库里定义
+        // Element Plus 自带的变量表由 EP 的 CSS 提供，不在本仓库里定义；
+        // --reka-* 由 reka-ui 的原语在运行期挂到元素上（浮层的 transform-origin、
+        // 折叠内容的实测高度），同理不在本仓库定义
         const missing = [...used]
-            .filter(([name]) => !name.startsWith('--el-') && !name.startsWith('--tw-'))
+            .filter(([name]) => !name.startsWith('--el-') && !name.startsWith('--tw-') && !name.startsWith('--reka-'))
             .filter(([name]) => !defined.has(name))
             .map(([name, file]) => `${name}（首次出现于 ${file}）`)
 
@@ -128,6 +133,60 @@ describe('CSS 自定义属性完整性', () => {
             }
         }
         expect(leaks).toEqual([])
+    })
+})
+
+describe('遗留全局重置必须待在 @layer base 里', () => {
+    /**
+     * 级联层的规则是「无层声明整体压过有层声明」，跟选择器权重无关。Tailwind 的工具类
+     * 全在 @layer utilities，所以裸着放的 `* { padding: 0 }` 会干掉所有 p- 与 m- 工具类，
+     * `button { border: none; background: none }` 会干掉 bg- 与 border- —— P1 在浏览器里
+     * 实测过：主按钮塌成 42×18px 的白字白底。生产构建里同样会踩，jsdom 与 axe 都看不见，
+     * 所以只能在这里静态盯着。
+     *
+     * 下面 EP / TinyMCE 的 !important 补丁保持无层是故意的：important 的层序是反的。
+     */
+    // 用去掉注释的版本：文件头那段说明里就有以 * 开头的行，会被下面的元素级重置扫到
+    const css = CODE.get(join('src', 'style.css'))
+
+    it('重置规则包在 @layer base 里，不能裸着放', () => {
+        const layer = css.match(/@layer\s+base\s*\{([\s\S]*?)\n\}/)
+        expect(layer, 'style.css 里找不到 @layer base 块').not.toBeNull()
+        for (const selector of ['*', 'ul, ol', 'img', 'button, input, select, textarea']) {
+            expect(layer[1], `${selector} 的重置跑到 @layer base 外面了`)
+                .toContain(`${selector} {`)
+        }
+    })
+
+    it('@layer base 外面不许再出现不带 !important 的元素级重置', () => {
+        const outside = css.replace(/@layer\s+base\s*\{[\s\S]*?\n\}/, '')
+        const bare = [...outside.matchAll(/(^|\n)\s*(\*|button|input|img|ul|ol)[^{}]*\{([^{}]*)\}/g)]
+            .filter(([, , , body]) => !body.includes('!important'))
+            .map(([match]) => match.trim().split('\n')[0])
+        expect(bare).toEqual([])
+    })
+})
+
+describe('fg-subtle 只给非文本用', () => {
+    /**
+     * fg-subtle 对白底只有 3.36:1，够 SC 1.4.11 的图标（3:1），不够 SC 1.4.3 的正文
+     * （4.5:1；大字豁免线是 24px / 粗体 18.66px，13px 小字够不上）。判定「这是文字」
+     * 的信号是同一处 class 里同时出现字号类：图标只写 size-*，不会带 text-caption 这种。
+     * 按行扫是够的 —— 本仓库的 class 串都写在一行里（多行 cn() 数组也是一行一个元素）。
+     */
+    const TYPE_SCALE = /\btext-(caption|body|label|mono|title|h[1-6])\b/
+
+    it('带字号类的元素不许用 text-fg-subtle，占位符同理', () => {
+        const offenders = []
+        for (const [file, code] of CODE) {
+            if (file === join('src', 'design', 'tokens.css')) continue
+            code.split('\n').forEach((line, i) => {
+                if (!line.includes('text-fg-subtle')) return
+                if (!TYPE_SCALE.test(line) && !line.includes('placeholder:text-fg-subtle')) return
+                offenders.push(`${file}:${i + 1} ${line.trim().slice(0, 90)}`)
+            })
+        }
+        expect(offenders).toEqual([])
     })
 })
 

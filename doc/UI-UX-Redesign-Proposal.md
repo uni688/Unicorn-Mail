@@ -309,7 +309,7 @@ Layer 3  Component   --um-btn-primary-bg / --um-row-height / --um-sidebar-w
 | `bg-overlay` | `rgb(10 10 11 / .32)` | `rgb(0 0 0 / .60)` | 遮罩 |
 | `fg-default` | `#1A1A1F` | `#ECECEF` | 主文字 |
 | `fg-muted` | `#63636E` | `#9C9CA6` | 次级文字（AA 5.9:1 / 6.4:1） |
-| `fg-subtle` | `#8B8B99` | `#6E6E78` | 三级文字、占位符（仅用于 ≥13px 非关键信息） |
+| `fg-subtle` | `#8B8B99` | `#6E6E78` | **非文本专用**：图标、圆点、滚动条滑块（≥3:1，见下方 P1 修订） |
 | `fg-disabled` | `#B4B4BF` | `#4A4A52` | 禁用 |
 | `fg-on-accent` | `#FFFFFF` | `#FFFFFF` | 强调底上的文字 |
 | `border-default` | `#E8E8EC` | `#26262B` | hairline |
@@ -318,7 +318,7 @@ Layer 3  Component   --um-btn-primary-bg / --um-row-height / --um-sidebar-w
 | `accent-solid` | `#6E56CF` | `#6E56CF` | 主按钮底（白字 5.39:1，两套主题同值） |
 | `accent-hover` | `#5B45B0` | `#7C66DD` | 实底 hover：浅色加深、深色提亮（都朝「远离表面」走） |
 | `accent-active` | `#473688` | `#8B72F0` | 实底 press |
-| `accent-fg` | `#5B45B0` | `#8B72F0` | **accent 当文字/链接/图标色时用这个**，不要用 `accent-solid` |
+| `accent-fg` | `#5B45B0` | `#A48FFB` | **accent 当文字/链接/图标色时用这个**，不要用 `accent-solid`（深色值见 P1 修订） |
 | `accent-subtle-bg` | `#F5F2FF` | `rgb(110 86 207 / .14)` | 强调徽章底 |
 | `accent-subtle-fg` | `#5B45B0` | `#C4B5FD` | 强调徽章文字 |
 | `accent-border` | `#DDD6FE` | `rgb(110 86 207 / .32)` | 强调描边 |
@@ -333,6 +333,33 @@ Layer 3  Component   --um-btn-primary-bg / --um-row-height / --um-sidebar-w
 > 同时新增 `accent-fg`：`accent-solid` 只保证「白字压在它上面」达标，
 > 不保证「它压在底色上」达标（深色下 `#6E56CF` 对 `bg-surface` 只有 3.42:1，够描边不够文字）。
 > 这些数值由 `mail-vue/test/design-tokens.spec.js` 逐对断言，改色阶会直接测试失败。
+
+> **P1 实施修订（2026-08-14，浏览器双主题实测）**：两处配色规则在 P1 的人工过审里被推翻。
+>
+> 1. **`fg-subtle` 降级为「非文本专用」，文字只保留两级（`fg-default` / `fg-muted`）。**
+>    原表与 §7.9 写的「`fg-subtle` 仅用于 ≥13px 非关键文本」这条豁免不成立：WCAG 2.2 SC 1.4.3
+>    的大字豁免线是 **24px（或粗体 18.66px）**，13px 小字照样要 4.5:1，而浅色 `fg-subtle`
+>    `#8B8B99` 对白底只有 **3.36:1**（对 `bg-inset` 3.06:1）。浏览器里实测到 300+ 处小字踩线
+>    （占位符、快捷键、计数、菜单分组标题、日历弱化日期等），已全部改走 `fg-muted`。
+>    近白底上做不出「三级都过 AA 且彼此可辨」的文字阶梯——要过 `bg-inset` 的 4.5:1，第三级
+>    得压到 ≈`#6E6E7B`，与 `fg-muted` `#63636E` 几乎看不出差别，所以按 Radix / Primer / Linear
+>    的通行做法收敛为两级文字 + 一级非文本。`fg-subtle` 保留给图标、状态圆点、滚动条滑块
+>    （SC 1.4.11 的 3:1），`fg-disabled` 更低但 disabled 控件被 1.4.3 豁免。
+>    护栏：`legacy-css.spec.js` 扫源码，凡同一行同时出现字号类与 `text-fg-subtle` 即失败。
+> 2. **深色 `accent-fg` 由 `#8B72F0`（violet-500）提到 `#A48FFB`（violet-400）。**
+>    菜单/下拉的选中行是 `accent-fg` 压在 `bg-selected` 上，而 `bg-selected`
+>    `rgb(124 102 221 / .14)` 叠在 `bg-raised` `#1A1A1D` 上把底提亮成 `rgb(40 37 56)`，
+>    violet-500 在这一档只有 **4.10:1**（实测），violet-400 是 5.62:1。
+>    半透明选中态会「抬高」有效底色这件事，静态只看 token 对是看不出来的，现已补进
+>    `design-tokens.spec.js`（`accent-fg` / `fg-default` / `fg-muted` × `bg-selected` 合成到 `bg-raised`）。
+>
+> 顺带修掉一处误用：`Field` 的必填星号原本用 `--um-danger-solid`（填充色，白底 4.38:1），
+> 改为 `--um-danger-subtle-fg`（文字色）。语义色当文字用只能走 `-subtle-fg`，与 accent 同理。
+>
+> 实测覆盖（`/_ds` 双主题）：整页 939 个文本节点 × 2 套主题 0 失败（各 28 处 disabled 控件
+> 属 1.4.3 豁免）；浮层 light 345 / dark 325 个节点 0 失败；Toast 8 种变体 light 39 / dark 16 个节点 0 失败。
+> SC 2.5.8（24×24 目标尺寸）另有一批小于线的控件已登记，但不在 P1 验收线内，
+> 且给 8px 间距的复选框、12px 的 chip 删除按钮盲目外扩命中区会互相抢点击，留待 P2 随组件重排一起处理。
 
 #### Semantic — 状态色
 
@@ -1083,7 +1110,7 @@ Linear 式：左侧 220px 分组导航 + 右侧 max 720px 内容列，每个 sec
 - 验证码 `Badge`（`accent subtle`）点击复制并 Toast，`stopPropagation`。
 - 星标：hover 才显示空心星，已加星常显实心（`accent`，不用彩色图标）。
 - 右键 → `ContextMenu`（标记已读/未读、星标、删除、复制发件人、在新标签打开）。取代现有 `rightChecked` + 硬编码 `#FDF6EC` 背景。
-- 摘要文本 `line-clamp: 1`，`fg-subtle`。
+- 摘要文本 `line-clamp: 1`，`fg-muted`（`fg-subtle` 已按 P1 修订降级为非文本专用）。
 - 行高 44px（桌面标准）/ 36px（紧凑）/ 88px（移动）。
 
 #### CommandPalette
@@ -1157,7 +1184,7 @@ Trigger（侧栏顶部，h 36px，w 100%-16）
 #### CommandBar（v1.1 新增）
 
 - 高 44px，`bg-canvas`，`border-bottom 1px border-default`；左中右三段用 `Separator` 分隔。
-- **上下文操作常驻 + `disabled`**，不用 `v-if`。`disabled` 态 `fg-subtle` + `cursor-not-allowed` + Tooltip 说明为什么不可用（「先选择邮件」）。
+- **上下文操作常驻 + `disabled`**，不用 `v-if`。`disabled` 态 `fg-disabled` + `cursor-not-allowed` + Tooltip 说明为什么不可用（「先选择邮件」）。
 - 窄屏（< 1024）中段自动折叠进 `⋯` DropdownMenu；< 768 整条隐藏，操作移到底部 ActionBar。
 - 所有按钮有 `title` + `aria-keyshortcuts`，与 §7.1 快捷键一一对应。
 
@@ -1324,7 +1351,7 @@ v1.1 说明：因为侧栏不再承载管理/开发者入口（§5.1），命令
 ### 7.9 可访问性验收线
 
 - 全站 `:focus-visible` 可见；`Tab` 顺序符合视觉顺序；跳转链接「跳到主内容」。
-- 对比度：正文 ≥ 4.5:1，`fg-subtle` 仅用于 ≥13px 非关键文本且 ≥ 3:1。
+- 对比度：正文（含 13px 小字）≥ 4.5:1，仅 ≥24px / ≥18.66px 粗体可降到 3:1；`fg-subtle` **不用于文本**，只给图标/圆点/滑块，按 SC 1.4.11 收 ≥3:1。判定基准是**合成后的有效底色**（半透明 hover/selected 要叠到实底上算）。
 - 所有浮层用 Reka UI 的焦点陷阱 + `aria-modal` + 关闭后焦点归还触发元素。
 - 列表用 `role="list"/"listitem"`，虚拟列表声明 `aria-rowcount`。
 - **虚拟列表 + `aria-activedescendant` 的组合必须专项验证（v1.2）**：`MailboxPicker` 与 `MailList` 都是虚拟化的，键盘移动到未挂载的项时 `aria-activedescendant` 会指向不存在的 id。规则：先滚动挂载目标项，再设 `activedescendant`，两者同一帧内完成。P1 阶段用 NVDA + VoiceOver 各过一遍。
@@ -1468,7 +1495,7 @@ src/design/
   --light-ill: var(--um-bg-inset);
   --base-fill: var(--um-bg-hover);
   --regular-text-color: var(--um-fg-muted);
-  --secondary-text-color: var(--um-fg-subtle);
+  --secondary-text-color: var(--um-fg-muted);   /* P1 修订：旧变量喂的是文字，不能给 fg-subtle */
   --email-hover-background: var(--um-bg-hover);
   --choose-account-background: var(--um-bg-selected);
   /* …其余 36 个旧变量逐一映射 */

@@ -1,0 +1,32 @@
+/* ============================================================================
+ * 第三方兼容层 — vaul-vue（移动端 Sheet）
+ * 参见 doc/UI-UX-Redesign-Proposal.md §4.7 §8.1 §8.2
+ *
+ * vaul 在导入时用 JS 往 <head> 注入一张样式表，里面有两处和本设计系统冲突：
+ *
+ * 1. 时长写死 .5s（transition 与 animation 都是）。§8.2 明确禁止 > 320ms 的 UI
+ *    过渡，§8.1 给 Sheet 的预算是 `dur-sheet 320ms`。拖拽释放/吸附的时长还是
+ *    vaul 用内联样式写的，选择器再具体也压不住，所以只能用 !important。
+ *    注意只改 duration 不改 timing-function：cubic-bezier(.32,.72,0,1) 就是
+ *    §8.1 里 spring{260,30} 想要的那种「先快后极缓、无回弹」手感，自己换成
+ *    ease-standard 反而会丢掉 iOS sheet 的分量感。
+ *    拖拽过程中 vaul 内联的是 `transition: none`（transition-property: none），
+ *    这里只覆盖 duration，因此不会把拖拽期间的跟手位移变成插值动画。
+ *
+ * 2. 拖拽把手写死 #e2e2e4，暗色下是一条脏白线。
+ *
+ * 本文件故意不放进 @layer：@layer 里的 !important 优先级高于无层 !important，
+ * 于是 base.css 的 prefers-reduced-motion 冻结依然能压过下面这两条。
+ * ==========================================================================*/
+
+[data-vaul-drawer],
+[data-vaul-overlay] {
+    transition-duration: 320ms !important;
+    animation-duration: 320ms !important;
+}
+
+[data-vaul-handle] {
+    /* vaul 用的是 background 简写，这里用 background-color 加 !important 覆盖 */
+    background-color: var(--um-border-strong) !important;
+    opacity: 1 !important;
+}

@@ -338,6 +338,50 @@ const zh = {
     searchUser: '搜索用户',
     searchEmail: '搜索邮箱',
     searchSender: '搜索发件人',
-    userEmail: '用户邮箱'
+    userEmail: '用户邮箱',
+
+    /**
+     * L1 原语（components/ui）的内置文案。
+     * 键名必须与 `components/ui/_shared/useUiText.js` 的 `UI_TEXT_FALLBACK` 一一对应：
+     * 原语先查这里，查不到才用那份兜底，所以少一个键只会静默降级、不会报错。
+     */
+    ui: {
+        close: '关闭',
+        clear: '清除',
+        copy: '复制',
+        copied: '已复制',
+        copyFailed: '复制失败',
+        loading: '加载中',
+        select: '请选择',
+        search: '搜索',
+        noResults: '无匹配结果',
+        increase: '增加',
+        decrease: '减少',
+        remove: '移除',
+        expand: '展开',
+        collapse: '收起',
+        prevPage: '上一页',
+        nextPage: '下一页',
+        firstPage: '首页',
+        lastPage: '末页',
+        morePages: '更多页',
+        page: '第 {n} 页',
+        pagination: '分页',
+        prevMonth: '上个月',
+        nextMonth: '下个月',
+        pickDate: '选择日期',
+        today: '今天',
+        unread: '未读',
+        dismiss: '关闭提示',
+        required: '必填',
+        optional: '选填',
+        dialog: '对话框',
+        confirm: '确定',
+        cancel: '取消',
+        more: '更多',
+        undo: '撤销',
+        retry: '重试',
+        notifications: '通知'
+    }
 }
 export default zh

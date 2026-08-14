@@ -1,3 +1,5 @@
+// @vitest-environment node
+// token 对比度是静态计算，不需要 DOM
 import {readFileSync} from 'node:fs'
 import {fileURLToPath} from 'node:url'
 import {describe, expect, it} from 'vitest'
@@ -50,6 +52,8 @@ const TEXT_PAIRS = [
     ['--um-fg-muted', '--um-bg-canvas', 4.5],
     ['--um-fg-muted', '--um-bg-subtle', 4.5],
     ['--um-fg-muted', '--um-bg-surface', 4.5],
+    // 菜单/浮层是 bg-raised，MENU_LABEL 与快捷键都落在这层
+    ['--um-fg-muted', '--um-bg-raised', 4.5],
     ['--um-fg-muted', '--um-bg-inset', 4.5],
     ['--um-fg-muted', '--um-bg-hover', 4.5, '--um-bg-surface'],
     // 主按钮：白字压在实底上。这一条就是 dark accent-solid 不能用 violet-550 的原因
@@ -57,12 +61,26 @@ const TEXT_PAIRS = [
     // accent 当文字用必须走 accent-fg，不能走 accent-solid
     ['--um-accent-fg', '--um-bg-canvas', 4.5],
     ['--um-accent-fg', '--um-bg-surface', 4.5],
+    // 选中行：紫色半透明把底提亮，是 accent-fg 最难的一档（bg-raised 是浮层底，最亮）
+    ['--um-accent-fg', '--um-bg-selected', 4.5, '--um-bg-raised'],
+    ['--um-fg-default', '--um-bg-selected', 4.5, '--um-bg-raised'],
+    ['--um-fg-muted', '--um-bg-selected', 4.5, '--um-bg-raised'],
+    ['--um-fg-muted', '--um-bg-hover', 4.5, '--um-bg-raised'],
     ['--um-accent-subtle-fg', '--um-accent-subtle-bg', 4.5, '--um-bg-surface'],
     ['--um-sidebar-fg', '--um-sidebar-bg', 4.5],
+    // 语义色当文字用同样只能走 -subtle-fg：Field 的必填星号就在卡片底上（见下方 UI_PAIRS 的 -solid）
+    ['--um-danger-subtle-fg', '--um-bg-canvas', 4.5],
+    ['--um-danger-subtle-fg', '--um-bg-surface', 4.5],
     ['--um-success-subtle-fg', '--um-success-subtle-bg', 4.5, '--um-bg-surface'],
     ['--um-warning-subtle-fg', '--um-warning-subtle-bg', 4.5, '--um-bg-surface'],
     ['--um-danger-subtle-fg', '--um-danger-subtle-bg', 4.5, '--um-bg-surface'],
     ['--um-info-subtle-fg', '--um-info-subtle-bg', 4.5, '--um-bg-surface'],
+    // solid Badge 与 danger 按钮：白字压在 -strong 上。这一组就是「-solid 不能当实底」的原因
+    ['--um-fg-on-strong', '--um-neutral-strong', 4.5],
+    ['--um-fg-on-strong', '--um-success-strong', 4.5],
+    ['--um-fg-on-strong', '--um-warning-strong', 4.5],
+    ['--um-fg-on-strong', '--um-danger-strong', 4.5],
+    ['--um-fg-on-strong', '--um-info-strong', 4.5],
 ]
 
 // 非文字元素（图标 / 描边 / 焦点环 / 状态点）按 WCAG 2.2 SC 1.4.11 只要 3:1
@@ -78,9 +96,17 @@ const UI_PAIRS = [
     ['--um-danger-solid', '--um-bg-surface', 3],
     ['--um-info-solid', '--um-bg-surface', 3],
     ['--um-sidebar-indicator', '--um-sidebar-bg', 3],
-    // §4.2 写明 fg-subtle 只用于 ≥13px 的非关键信息，因此按 3:1 收
+    /**
+     * fg-subtle 是**非文本专用**（图标、圆点、滚动条滑块），只按 1.4.11 的 3:1 收。
+     * 原来 §4.2 写的是「只用于 ≥13px 的非关键信息」——那条规则不成立：1.4.3 的大字
+     * 豁免线是 24px（粗体 18.66px），13px 小字仍要 4.5:1，而浅色 fg-subtle 对白底
+     * 只有 3.36:1。P1 在浏览器里实测到 300+ 处小字踩这条线，已全部改走 fg-muted；
+     * 三级文字在近白底上无法同时满足 AA 且彼此可辨，所以文字只保留两级。
+     */
     ['--um-fg-subtle', '--um-bg-canvas', 3],
     ['--um-fg-subtle', '--um-bg-surface', 3],
+    ['--um-fg-subtle', '--um-bg-raised', 3],
+    ['--um-fg-subtle', '--um-bg-inset', 3],
     // hover/active 是瞬时态，不按正文 4.5 收，但也不能烂到看不清
     ['--um-fg-on-accent', '--um-accent-hover', 3],
     ['--um-fg-on-accent', '--um-accent-active', 3],

@@ -47,6 +47,34 @@
         outline: none;
     }
 
+    /* --- 视觉隐藏（§4.11 VisuallyHidden）---
+     * Tailwind 的 sr-only 是永久隐藏，没法在聚焦时恢复；这里补一对可聚焦变体，
+     * 给 `Skip to content` 这类「平时不占位、Tab 到才现身」的入口用。
+     * 注意不加 aria-hidden：内容必须留在无障碍树里。 */
+    .um-visually-hidden {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip-path: inset(50%);
+        white-space: nowrap;
+        border-width: 0;
+    }
+
+    /* 自己或内部子节点被键盘聚焦时恢复正常渲染 */
+    .um-visually-hidden-focusable:focus-visible,
+    .um-visually-hidden-focusable:has(:focus-visible) {
+        position: static;
+        width: auto;
+        height: auto;
+        margin: 0;
+        overflow: visible;
+        clip-path: none;
+        white-space: normal;
+    }
+
     /* --- 滚动条 --- */
     * {
         scrollbar-width: thin;

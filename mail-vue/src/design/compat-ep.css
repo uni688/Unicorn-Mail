@@ -53,7 +53,7 @@
     --el-text-color-primary: var(--um-fg-default);
     --el-text-color-regular: var(--um-fg-default);
     --el-text-color-secondary: var(--um-fg-muted);
-    --el-text-color-placeholder: var(--um-fg-subtle);
+    --el-text-color-placeholder: var(--um-fg-muted);
     --el-text-color-disabled: var(--um-fg-disabled);
     --el-border-color: var(--um-border-default);
     --el-border-color-light: var(--um-border-default);
@@ -100,7 +100,7 @@
 
     --loadding-background: color-mix(in oklab, var(--um-bg-canvas) 80%, transparent);
     --regular-text-color: var(--um-fg-muted);
-    --secondary-text-color: var(--um-fg-subtle);
+    --secondary-text-color: var(--um-fg-muted);
     --form-desc-color: var(--um-fg-muted);
     --email-scroll-content-color: var(--um-fg-muted);
     --email-hover-background: var(--um-bg-hover);

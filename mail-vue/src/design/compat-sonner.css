@@ -1,0 +1,45 @@
+/* ============================================================================
+ * 第三方兼容层 — vue-sonner（Toast）
+ * 参见 doc/UI-UX-Redesign-Proposal.md §6.1 §8.2 §8.3
+ *
+ * Toaster 挂的是 `unstyled` + `toastOptions.classes`（见 ui/Toast/Toaster.vue），
+ * 所以 sonner 自带的外观（`[data-sonner-toast][data-styled=true]`）根本不生效，
+ * 保留下来的只有定位、堆叠、手势那部分。剩下三处仍需要压：
+ *
+ * 1. 堆叠/进出过渡写死 400ms，超过 §8.2 的 320ms 上限。压到 200ms 还有个额外
+ *    好处：sonner 的 TIME_BEFORE_UNMOUNT 是 200ms，节点会在 200ms 后被移除，
+ *    原来那 400ms 的退场其实播不完就被砍断了。
+ *    只覆盖 duration 不覆盖 transition-property：`[data-swiping=true]` 里
+ *    sonner 用 `transition: none` 关掉跟手位移的插值，property 被改就毁了。
+ *
+ * 2. `[data-sonner-toast]:focus-visible` 给的是 box-shadow 焦点环 —— §8.2 禁止
+ *    box-shadow 动画，而且我们的焦点环统一是 base.css 的 outline。这里只清掉
+ *    box-shadow，outline 环照旧（清掉后过渡列表里的 box-shadow 也就没东西可动了）。
+ *
+ * 3. Toaster 根元素写死了一串 ui-sans-serif 字体栈，会盖掉 --um-font-sans。
+ *
+ * 本文件故意不放进 @layer：@layer 里的 !important 优先级高于无层 !important，
+ * 于是 base.css 的 prefers-reduced-motion 冻结依然能压过下面的时长。
+ * ==========================================================================*/
+
+[data-sonner-toaster],
+[data-sonner-toast],
+[data-sonner-toast] > * {
+    transition-duration: 200ms !important;
+}
+
+/* 收起成叠时，后面几条只露出「一条的高度」那么一截。sonner 靠
+   `[data-styled=true] > * { opacity: 0 }` 把被压住的内容藏起来，而 unstyled 下这条
+   带门禁的规则不生效，标题就会从上一条里透出来。这里补回同样的行为
+   （`overflow-hidden` 在 toast 自己的 class 上，两者一起才干净）。 */
+[data-sonner-toast][data-expanded='false'][data-front='false'] > * {
+    opacity: 0;
+}
+
+[data-sonner-toast]:focus-visible {
+    box-shadow: none !important;
+}
+
+[data-sonner-toaster] {
+    font-family: var(--um-font-sans) !important;
+}

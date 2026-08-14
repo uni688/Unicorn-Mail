@@ -338,7 +338,47 @@ const en = {
     searchUser: 'Search by user',
     searchEmail: 'Search by Email',
     searchSender: 'Search by Sender',
-    userEmail: 'Email Address'
+    userEmail: 'Email Address',
+
+    /** L1 primitives (components/ui) — keys mirror `UI_TEXT_FALLBACK` in `_shared/useUiText.js` */
+    ui: {
+        close: 'Close',
+        clear: 'Clear',
+        copy: 'Copy',
+        copied: 'Copied',
+        copyFailed: 'Copy failed',
+        loading: 'Loading',
+        select: 'Select',
+        search: 'Search',
+        noResults: 'No results',
+        increase: 'Increase',
+        decrease: 'Decrease',
+        remove: 'Remove',
+        expand: 'Expand',
+        collapse: 'Collapse',
+        prevPage: 'Previous page',
+        nextPage: 'Next page',
+        firstPage: 'First page',
+        lastPage: 'Last page',
+        morePages: 'More pages',
+        page: 'Page {n}',
+        pagination: 'Pagination',
+        prevMonth: 'Previous month',
+        nextMonth: 'Next month',
+        pickDate: 'Pick a date',
+        today: 'Today',
+        unread: 'Unread',
+        dismiss: 'Dismiss',
+        required: 'Required',
+        optional: 'Optional',
+        dialog: 'Dialog',
+        confirm: 'Confirm',
+        cancel: 'Cancel',
+        more: 'More',
+        undo: 'Undo',
+        retry: 'Retry',
+        notifications: 'Notifications'
+    }
 }
 
 export default en

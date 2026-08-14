@@ -11,28 +11,41 @@
  *   - :deep(.el-input__inner:focus)                  （普通 css 文件里 :deep() 不会被编译，死代码）
  * ==========================================================================*/
 
-* {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-    -webkit-tap-highlight-color: transparent;
-}
+/* --- 全局重置 ---------------------------------------------------------------
+ * 必须裹在 @layer base 里。级联层的规则是：**无层声明整体压过有层声明**，与
+ * 选择器权重无关；而 Tailwind 的工具类全在 @layer utilities。裸着放的后果是
+ * `* { padding: 0 }` 干掉所有 p-* 与 m-*，`button { border: none; background: none }`
+ * 干掉按钮/输入框的 bg-* 与 border-* —— 表现就是 L1 原语在真实页面里全是没上
+ * 样式的裸元素（P1 在浏览器里实测到的：主按钮 42×18px、白字白底）。
+ * 进了 base 层之后它仍排在 Tailwind preflight 之后，对未迁移的 EP 页面效果不变。
+ *
+ * 下面 EP / TinyMCE 的 !important 补丁保持无层：important 声明的层序是反的，
+ * 挪进层里会让它们反过来压住 EP 自己的 important 规则，那是另一回事。
+ * -------------------------------------------------------------------------*/
+@layer base {
+    * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+        -webkit-tap-highlight-color: transparent;
+    }
 
-ul, ol {
-    list-style: none;
-}
+    ul, ol {
+        list-style: none;
+    }
 
-img {
-    max-width: 100%;
-    height: auto;
-    display: block;
-}
+    img {
+        max-width: 100%;
+        height: auto;
+        display: block;
+    }
 
-button, input, select, textarea {
-    font-family: inherit;
-    font-size: inherit;
-    border: none;
-    background: none;
+    button, input, select, textarea {
+        font-family: inherit;
+        font-size: inherit;
+        border: none;
+        background: none;
+    }
 }
 
 /* --- Element Plus 局部修补（P6 随 EP 一起删） ------------------------------ */

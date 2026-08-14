@@ -1,3 +1,5 @@
+// @vitest-environment node
+// 同 legacy-css.spec.js：读源码做静态断言，留在 node 环境
 import {readFileSync} from 'node:fs'
 import {join} from 'node:path'
 import {fileURLToPath} from 'node:url'

@@ -19,7 +19,13 @@
     --color-selected: var(--um-bg-selected);
     --color-overlay: var(--um-bg-overlay);
 
-    /* --- 前景 --- */
+    /* --- 前景 ---
+     * 文字只有两级：fg / fg-muted，两级在所有 bg-* 上都 ≥ 4.5:1。
+     * `text-fg-subtle` 是**非文本专用**（图标、圆点、滚动条滑块），只保证 ≥ 3:1
+     * ——WCAG 1.4.3 的大字豁免是 ≥24px（或 ≥18.66px 粗体），13px 够不上，所以
+     * 占位符 / 快捷键 / 计数这类小字一律用 fg-muted。fg-disabled 更低，但
+     * disabled 控件本身被 1.4.3 豁免。详见 P1 浏览器实测记录。
+     */
     --color-fg: var(--um-fg-default);
     --color-fg-muted: var(--um-fg-muted);
     --color-fg-subtle: var(--um-fg-subtle);
@@ -53,6 +59,14 @@
     --color-info: var(--um-info-solid);
     --color-info-subtle: var(--um-info-subtle-bg);
     --color-info-fg: var(--um-info-subtle-fg);
+
+    /* --- 实底色（solid Badge / danger 按钮：白字压在上面，与 -solid 分开） --- */
+    --color-neutral-strong: var(--um-neutral-strong);
+    --color-success-strong: var(--um-success-strong);
+    --color-warning-strong: var(--um-warning-strong);
+    --color-danger-strong: var(--um-danger-strong);
+    --color-info-strong: var(--um-info-strong);
+    --color-on-strong: var(--um-fg-on-strong);
 
     /* --- 侧栏（不再是深蓝） --- */
     --color-sidebar: var(--um-sidebar-bg);
@@ -135,6 +149,131 @@
     --ease-in: cubic-bezier(.4, 0, 1, 1);
     --default-transition-duration: 120ms;
     --default-transition-timing-function: cubic-bezier(.2, 0, .2, 1);
+
+    /* 骨架微光：§6.2 指定「1600ms linear infinite 的 background-position」。
+       只动 background-position、不动 opacity，避免骨架整块忽明忽暗。
+       prefers-reduced-motion 由 base.css 统一冻结（duration 0.01ms + 单次）。 */
+    --animate-skeleton: um-skeleton 1600ms linear infinite;
+
+    @keyframes um-skeleton {
+        from {
+            background-position: 100% 0;
+        }
+        to {
+            background-position: -100% 0;
+        }
+    }
+
+    /* 不确定进度：一条 40% 宽的条来回扫。用 translate 而不是 width，只跑合成层。 */
+    --animate-progress-indeterminate: um-progress-indeterminate 1400ms var(--ease-standard) infinite;
+
+    @keyframes um-progress-indeterminate {
+        from {
+            transform: translateX(-100%);
+        }
+        to {
+            transform: translateX(250%);
+        }
+    }
+
+    /* 浮层进出（§8.1）：下拉 / Popover 进入 160ms ease-out（opacity + translateY -4px→0），
+       退出反向 120ms ease-in。方向感靠 reka 给的 --reka-popper-transform-origin 撑，
+       所以这里只用一组关键帧，不按 side 拆四份。 */
+    --animate-popover-in: um-popover-in 160ms var(--ease-out);
+    --animate-popover-out: um-popover-out 120ms var(--ease-in);
+
+    @keyframes um-popover-in {
+        from {
+            opacity: 0;
+            transform: translateY(-4px) scale(.98);
+        }
+        to {
+            opacity: 1;
+            transform: none;
+        }
+    }
+
+    @keyframes um-popover-out {
+        from {
+            opacity: 1;
+            transform: none;
+        }
+        to {
+            opacity: 0;
+            transform: translateY(-4px) scale(.98);
+        }
+    }
+
+    /* 模态遮罩：§8.1 指定 160ms */
+    --animate-overlay-in: um-overlay-in 160ms var(--ease-out);
+    --animate-overlay-out: um-overlay-out 120ms var(--ease-in);
+
+    @keyframes um-overlay-in {
+        from {
+            opacity: 0;
+        }
+        to {
+            opacity: 1;
+        }
+    }
+
+    @keyframes um-overlay-out {
+        from {
+            opacity: 1;
+        }
+        to {
+            opacity: 0;
+        }
+    }
+
+    /* Dialog：§8.1 指定 opacity + scale .97→1，200ms ease-out */
+    --animate-dialog-in: um-dialog-in 200ms var(--ease-out);
+    --animate-dialog-out: um-dialog-out 120ms var(--ease-in);
+
+    @keyframes um-dialog-in {
+        from {
+            opacity: 0;
+            transform: scale(.97);
+        }
+        to {
+            opacity: 1;
+            transform: none;
+        }
+    }
+
+    @keyframes um-dialog-out {
+        from {
+            opacity: 1;
+            transform: none;
+        }
+        to {
+            opacity: 0;
+            transform: scale(.97);
+        }
+    }
+
+    /* 折叠展开：height 是 §8.3 允许的例外之一（侧栏 / 列表项），180ms ease-standard。
+       高度值由 reka 在 CollapsibleContent 上注入 --reka-collapsible-content-height。 */
+    --animate-collapsible-down: um-collapsible-down 180ms var(--ease-standard);
+    --animate-collapsible-up: um-collapsible-up 180ms var(--ease-standard);
+
+    @keyframes um-collapsible-down {
+        from {
+            height: 0;
+        }
+        to {
+            height: var(--reka-collapsible-content-height);
+        }
+    }
+
+    @keyframes um-collapsible-up {
+        from {
+            height: var(--reka-collapsible-content-height);
+        }
+        to {
+            height: 0;
+        }
+    }
 }
 
 /* Tailwind v4 深色变体：类名挂在 <html> 上，不使用 media 查询 */
@@ -198,6 +337,17 @@
     --um-info-subtle-bg: var(--um-cyan-50);
     --um-info-subtle-fg: var(--um-cyan-700);
 
+    /* 实底：solid Badge 与 danger 按钮的底色。
+       为什么不直接用 -solid：-solid 是「状态点 / 描边」用的 500 档，白字压上去
+       只有 3.4~4.4:1（green-500 3.41 / amber-500 3.38 / red-500 4.38），过不了 AA。
+       700 档才够（5.8~7.3:1）。hover/active 不再换色，按 §6.2 用 brightness ±8%。 */
+    --um-neutral-strong: var(--um-gray-700);
+    --um-success-strong: var(--um-green-700);
+    --um-warning-strong: var(--um-amber-700);
+    --um-danger-strong: var(--um-red-700);
+    --um-info-strong: var(--um-cyan-700);
+    --um-fg-on-strong: #FFFFFF;
+
     /* 图表 */
     --um-chart-1: #6E56CF;
     --um-chart-2: #2E9E5B;
@@ -260,7 +410,10 @@
     --um-accent-solid: var(--um-violet-600);
     --um-accent-hover: var(--um-violet-550);
     --um-accent-active: var(--um-violet-500);
-    --um-accent-fg: var(--um-violet-500);
+    /* accent 当文字用要再亮一档：菜单/下拉的选中行是 accent-fg 压在 bg-selected 上，
+       而 bg-selected 本身是紫色半透明，把底提亮了。violet-500 在 bg-raised + bg-selected
+       上只有 4.10:1（P1 浏览器实测），violet-400 是 5.62:1。 */
+    --um-accent-fg: var(--um-violet-400);
     --um-accent-subtle-bg: rgb(110 86 207 / .14);
     --um-accent-subtle-fg: var(--um-violet-300);
     --um-accent-border: rgb(110 86 207 / .32);
@@ -282,6 +435,10 @@
     --um-info-solid: var(--um-cyan-400);
     --um-info-subtle-bg: rgb(var(--um-cyan-rgb) / .14);
     --um-info-subtle-fg: var(--um-cyan-300);
+
+    /* 实底：深色下沿用同一档 700（深色底上更沉稳，白字仍 5.8~7.3:1）。
+       中性色例外——gray-700 压在 #141416 上几乎看不出形状，提一档到 gray-600。 */
+    --um-neutral-strong: var(--um-gray-600);
 
     /* 图表：统一提亮一档 */
     --um-chart-1: #8B72F0;
@@ -344,6 +501,25 @@
     --um-card-p: 20px;
     --um-focus-ring-w: 2px;
     --um-focus-ring-offset: 2px;
+
+    /* 骨架微光的两个色停（§6.2：浅色 gray-100 → gray-50）。
+       整条渐变做成一个 token，组件侧只写 bg-[image:var(--um-skeleton-gradient)]。 */
+    --um-skeleton-gradient: linear-gradient(
+            90deg,
+            var(--um-bg-inset) 25%,
+            var(--um-bg-subtle) 37%,
+            var(--um-bg-inset) 63%
+    );
+}
+
+/* 深色：§6.2 指定 #1A1A1D → #141416，即 bg-raised → bg-surface（比底色亮一档再回落） */
+:root.dark {
+    --um-skeleton-gradient: linear-gradient(
+            90deg,
+            var(--um-bg-raised) 25%,
+            var(--um-bg-surface) 37%,
+            var(--um-bg-raised) 63%
+    );
 }
 
 @media (min-width: 1440px) {

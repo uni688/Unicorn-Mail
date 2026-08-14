@@ -5,7 +5,7 @@
       style="height: var(--um-topbar-h)"
     >
       <span class="text-title">Design System</span>
-      <span class="rounded-sm bg-accent-subtle px-2 py-px text-micro uppercase text-accent-subtle-fg">P0</span>
+      <span class="rounded-sm bg-accent-subtle px-2 py-px text-micro uppercase text-accent-subtle-fg">P0 · P1</span>
       <span class="ml-auto text-caption text-fg-muted">断点 {{ current }}</span>
       <div class="flex items-center gap-0.5 rounded-md bg-inset p-0.5">
         <button
@@ -35,7 +35,7 @@
             <div class="h-14 border-b border-line" :style="{background: `var(${t.token})`}" />
             <div class="px-3 py-2">
               <div class="truncate text-label">{{ t.name }}</div>
-              <div class="truncate font-mono text-mono text-fg-subtle">{{ t.token }}</div>
+              <div class="truncate font-mono text-mono text-fg-muted">{{ t.token }}</div>
             </div>
           </div>
         </div>
@@ -67,9 +67,9 @@
         <p class="mt-1 text-caption text-fg-muted">基准 14px，密度导向；未读态用 550 而非 bold（§4.3）。</p>
         <div class="mt-4 divide-y divide-line rounded-lg border border-line bg-surface">
           <div v-for="t in typeScale" :key="t.cls" class="flex items-baseline gap-4 px-4 py-3">
-            <code class="w-32 shrink-0 font-mono text-mono text-fg-subtle">{{ t.cls }}</code>
+            <code class="w-32 shrink-0 font-mono text-mono text-fg-muted">{{ t.cls }}</code>
             <span :class="t.cls">{{ t.sample }}</span>
-            <span class="ml-auto shrink-0 text-caption text-fg-subtle">{{ t.meta }}</span>
+            <span class="ml-auto shrink-0 text-caption text-fg-muted">{{ t.meta }}</span>
           </div>
         </div>
       </section>
@@ -79,13 +79,13 @@
         <div class="mt-4 flex flex-wrap gap-4">
           <div v-for="r in radii" :key="r.cls" class="text-center">
             <div class="size-16 border border-line bg-inset" :class="r.cls" />
-            <div class="mt-1.5 font-mono text-mono text-fg-subtle">{{ r.label }}</div>
+            <div class="mt-1.5 font-mono text-mono text-fg-muted">{{ r.label }}</div>
           </div>
         </div>
         <div class="mt-6 flex flex-wrap gap-5">
           <div v-for="s in shadows" :key="s.cls" class="text-center">
             <div class="size-20 rounded-lg bg-surface" :class="s.cls" />
-            <div class="mt-1.5 font-mono text-mono text-fg-subtle">{{ s.cls }}</div>
+            <div class="mt-1.5 font-mono text-mono text-fg-muted">{{ s.cls }}</div>
           </div>
         </div>
       </section>
@@ -103,7 +103,7 @@
             次按钮
           </button>
           <input
-            class="rounded-md border border-line-strong bg-inset px-3 py-2 text-body placeholder:text-fg-subtle"
+            class="rounded-md border border-line-strong bg-inset px-3 py-2 text-body placeholder:text-fg-muted"
             placeholder="原生 input"
           >
           <a class="rounded-sm text-label text-accent-fg underline-offset-4 hover:underline" href="#">链接</a>
@@ -129,12 +129,33 @@
         <h2 class="text-title-lg">布局尺度</h2>
         <div class="mt-4 grid grid-cols-2 gap-x-6 gap-y-2 sm:grid-cols-3 lg:grid-cols-4">
           <div v-for="l in layout" :key="l" class="flex items-baseline justify-between gap-2 border-b border-line py-1.5">
-            <code class="font-mono text-mono text-fg-subtle">{{ l }}</code>
+            <code class="font-mono text-mono text-fg-muted">{{ l }}</code>
             <span class="um-tnum text-caption">{{ cssVar(l) }}</span>
           </div>
         </div>
       </section>
-      <!-- P1 起在这里逐组件追加 21 个 L1 原语的全变体展示 -->
+
+      <section id="primitives" class="scroll-mt-20">
+        <h2 class="text-title-lg">L1 原语</h2>
+        <p class="mt-1 text-caption text-fg-muted">
+          §6.1 的 21 类原语共 {{ COMPONENT_COUNT }} 个组件，逐个列出全部变体与状态。
+          每一行左侧是被演示的 prop，右侧是实物 —— 请在浅色/深色两套主题下各过一遍（§10.4 P1 验收）。
+        </p>
+        <nav class="mt-4 flex flex-wrap gap-1.5" aria-label="原语目录">
+          <a
+            v-for="link in TOC"
+            :key="link.id"
+            :href="`#${link.id}`"
+            class="rounded-sm bg-inset px-2 py-1 font-mono text-mono text-fg-muted transition-colors hover:bg-hover hover:text-fg"
+          >{{ link.label }}</a>
+        </nav>
+      </section>
+
+      <DsActions />
+      <DsDisplay />
+      <DsForms />
+      <DsOverlays />
+      <DsNavigation />
     </main>
   </div>
 </template>
@@ -143,11 +164,61 @@
 import {onMounted, ref} from 'vue'
 import {THEME_MODES, useTheme} from '@/composables/useTheme.js'
 import {useBreakpoint} from '@/composables/useBreakpoint.js'
+import DsActions from './sections/DsActions.vue'
+import DsDisplay from './sections/DsDisplay.vue'
+import DsForms from './sections/DsForms.vue'
+import DsOverlays from './sections/DsOverlays.vue'
+import DsNavigation from './sections/DsNavigation.vue'
 
 const {mode, isDark, setMode} = useTheme()
 const {current} = useBreakpoint()
 
 const modeLabel = {light: '浅色', dark: '深色', system: '跟随系统'}
+
+/** `src/components/ui/**\/*.vue` 的个数；`test/ui-barrels.spec.js` 守着别漏导出 */
+const COMPONENT_COUNT = 50
+
+/** 目录锚点，顺序与下面五个 section 文件的渲染顺序一致 */
+const TOC = [
+  {id: 'button', label: 'Button'},
+  {id: 'copybutton', label: 'CopyButton'},
+  {id: 'kbd', label: 'Kbd'},
+  {id: 'avatar', label: 'Avatar'},
+  {id: 'badge', label: 'Badge'},
+  {id: 'code', label: 'Code'},
+  {id: 'separator', label: 'Separator'},
+  {id: 'skeleton', label: 'Skeleton'},
+  {id: 'spinner', label: 'Spinner'},
+  {id: 'progress', label: 'Progress'},
+  {id: 'meter', label: 'Meter'},
+  {id: 'field', label: 'Field'},
+  {id: 'input', label: 'Input'},
+  {id: 'textarea', label: 'Textarea'},
+  {id: 'numberinput', label: 'NumberInput'},
+  {id: 'checkbox', label: 'Checkbox'},
+  {id: 'radio', label: 'RadioGroup'},
+  {id: 'switch', label: 'Switch'},
+  {id: 'select', label: 'Select'},
+  {id: 'combobox', label: 'Combobox'},
+  {id: 'tagsinput', label: 'TagsInput'},
+  {id: 'segmented', label: 'Segmented'},
+  {id: 'datepicker', label: 'DatePicker'},
+  {id: 'tooltip', label: 'Tooltip'},
+  {id: 'popover', label: 'Popover'},
+  {id: 'hovercard', label: 'HoverCard'},
+  {id: 'dropdownmenu', label: 'DropdownMenu'},
+  {id: 'contextmenu', label: 'ContextMenu'},
+  {id: 'dialog', label: 'Dialog'},
+  {id: 'alertdialog', label: 'AlertDialog'},
+  {id: 'sheet', label: 'Sheet'},
+  {id: 'command', label: 'Command'},
+  {id: 'toast', label: 'Toast'},
+  {id: 'tabs', label: 'Tabs'},
+  {id: 'collapsible', label: 'Collapsible'},
+  {id: 'scrollarea', label: 'ScrollArea'},
+  {id: 'pagination', label: 'Pagination'},
+  {id: 'tree', label: 'Tree'},
+]
 
 const semantic = [
   {name: 'canvas', token: '--um-bg-canvas'},
