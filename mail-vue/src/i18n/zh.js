@@ -382,6 +382,157 @@ const zh = {
         undo: '撤销',
         retry: '重试',
         notifications: '通知'
+    },
+    /* AppShell / 命令面板 / 命令条（§5.1 §6.2 §7.2） */
+    shell: {
+        mainNav: '主导航',
+        mailFolders: '邮件',
+        mainContent: '主内容',
+        skipToContent: '跳到主内容',
+        /** 草稿是 Dexie 本地库，标一下免得用户以为换设备也能看到（§5.1 数据源核对表） */
+        localOnly: '本机',
+        accountMenu: '账号菜单',
+        mailActions: '邮件操作',
+        quotaSend: '发信额度',
+        quotaMailbox: '邮箱额度',
+        quotaRemainDay: '今日还可发 {n} 封',
+        quotaRemainTotal: '还可发 {n} 封',
+        tabMail: '邮件',
+        tabMailboxes: '邮箱',
+        tabSettings: '设置',
+        searchPlaceholder: '搜索邮件、邮箱、命令',
+        searchAria: '搜索邮件、邮箱与命令',
+        /* `@` 必须写成 `{'@'}`：vue-i18n 把裸 `@` 当成链接消息（`@:key`）的开头，
+           整条消息会编译失败（Invalid linked format），连带整个命令面板渲染不出来 */
+        paletteHint: "> 命令 · {'@'} 邮箱 · # 设置",
+        paletteEmpty: '没有匹配的命令',
+        groupRecent: '最近访问',
+        groupActions: '动作',
+        groupGoto: '转到',
+        groupSettings: '设置',
+        groupMailboxes: '邮箱',
+        /* ⚙ 菜单的两个分栏（命令面板不分栏，只有 Topbar 用） */
+        groupAccount: '我的',
+        groupAdmin: '管理',
+        compose: '写邮件',
+        switchMailbox: '切换邮箱',
+        moreMailboxes: '管理全部邮箱',
+        current: '当前',
+        toggleTheme: '切换主题',
+        toggleLang: '切换语言',
+        toggleBgEffect: '切换背景效果',
+        copyMyEmail: '复制我的邮箱地址',
+        copied: '已复制 {value}',
+        shortcuts: '快捷键',
+        shortcutsTitle: '键盘快捷键',
+        shortcutsDesc: '置灰的条目在当前页面不可用。',
+        shortcutsToggle: '启用快捷键',
+        notifications: '公告',
+        settingsCenter: '设置中心',
+        toggleSidebar: '折叠 / 展开侧栏',
+        openMenu: '打开菜单',
+        markRead: '标记已读',
+        star: '星标',
+        delete: '删除',
+        copyCode: '复制验证码',
+        more: '更多',
+        selectMailFirst: '先选择邮件',
+        theme_light: '浅色',
+        theme_dark: '深色',
+        theme_system: '跟随系统',
+        bg_off: '关闭',
+        bg_glow: '柔光',
+        bg_particles: '粒子',
+        notFoundTitle: '找不到这个页面',
+        notFoundDesc: '链接可能已经失效，或者地址输错了。',
+        backToInbox: '回到收件箱'
+    },
+    /* 登录 / 注册 / 绑定 / OAuth 回调（§5.3）。旧登录页已有的文案继续用顶层键，
+       这里只补新增的四个视图需要、旧页面没有的部分。 */
+    auth: {
+        brandTagline: '自己的域名，自己的邮箱',
+        bindTitle: '绑定邮箱地址',
+        bindDesc: '为你的第三方账号选择一个邮箱地址，绑定后即可登录。',
+        bindBtn: '完成绑定',
+        oauthPending: '正在完成登录',
+        oauthFailedTitle: '登录没有完成',
+        oauthFailedDesc: '授权信息无效或已过期，请重新登录一次。',
+        backToLogin: '返回登录',
+        thirdParty: '第三方登录',
+        or: '或',
+        domainSelect: '选择域名',
+        emailPrefixPlaceholder: '邮箱前缀',
+        /* 「使用 X 继续」：OAuth 按钮的通用句式，X 是渠道名（现在只有 LinuxDo） */
+        continueWith: '使用 {name} 继续',
+        showPwd: '显示密码',
+        hidePwd: '隐藏密码',
+        /* 密码强度条（§5.3.1 注册页新增）。判定规则见 useAuth.js 的 passwordStrength() */
+        pwdStrength: '密码强度',
+        pwdWeak: '弱',
+        pwdFair: '一般',
+        pwdGood: '较强',
+        pwdStrong: '强'
+    },
+    /**
+     * 快捷键面板文案（§7.1）。键名 = `HOTKEY_CATALOG` 的 `label`，
+     * `scope_*` = `HOTKEY_SCOPES` 的分组名，两边必须一一对应。
+     */
+    hotkey: {
+        scope_global: '全局',
+        scope_sidebar: '侧栏',
+        scope_list: '邮件列表',
+        scope_read: '阅读',
+        scope_compose: '写信',
+        scope_table: '表格页',
+        scope_dialog: '对话框',
+
+        palette: '命令面板',
+        search: '搜索',
+        compose: '写新邮件',
+        goInbox: '收件箱',
+        goSent: '已发送',
+        goDraft: '草稿箱',
+        goStar: '星标邮件',
+        goTrash: '回收站',
+        settings: '设置',
+        goMailboxes: '邮箱管理',
+        goKeys: 'API 密钥',
+        goAdmin: '管理后台',
+        mailboxPicker: '切换邮箱（连按两次打开管理）',
+        theme: '切换主题',
+        shortcuts: '快捷键帮助',
+        escape: '关闭浮层 / 退出选择',
+        folderUp: '上一个文件夹',
+        folderDown: '下一个文件夹',
+        groupCollapse: '收起分组',
+        groupExpand: '展开分组',
+        folderMenu: '打开文件夹菜单',
+
+        nextMail: '下一封',
+        prevMail: '上一封',
+        openMail: '打开邮件',
+        toggleCheck: '勾选 / 取消勾选',
+        rangeCheck: '范围勾选',
+        checkAll: '全选当前页',
+        star: '标记星标',
+        toggleUnread: '已读 / 未读',
+        delete: '删除',
+        pane: '切换阅读窗格位置',
+        density: '切换列表密度',
+
+        readPrev: '上一封',
+        readNext: '下一封',
+        reply: '回复',
+        copySender: '复制发件人地址',
+
+        send: '发送',
+        saveDraft: '存草稿',
+
+        new: '新建',
+
+        submit: '提交',
+        cancel: '取消'
     }
 }
+
 export default zh

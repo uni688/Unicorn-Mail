@@ -274,6 +274,32 @@
             height: 0;
         }
     }
+
+    /* 认证页入场（§5.3.1）：卡片 240ms ease-out（opacity + translateY 8px + scale .98），
+       柔光背板延后 120ms 淡入 —— 先让表单到位，背景再浮上来。
+       两条都只动 opacity/transform/…，禁止视差倾斜与边框流光（§5.3.1 末）。 */
+    --animate-auth-card: um-auth-card 240ms var(--ease-out) both;
+    --animate-auth-glow: um-auth-glow 320ms var(--ease-out) 120ms both;
+
+    @keyframes um-auth-card {
+        from {
+            opacity: 0;
+            transform: translateY(8px) scale(.98);
+        }
+        to {
+            opacity: 1;
+            transform: none;
+        }
+    }
+
+    @keyframes um-auth-glow {
+        from {
+            opacity: 0;
+        }
+        to {
+            opacity: 1;
+        }
+    }
 }
 
 /* Tailwind v4 深色变体：类名挂在 <html> 上，不使用 media 查询 */
@@ -365,7 +391,15 @@
 
     /* 玻璃（§4.12；只允许 GlassCard / Overlay 读取） */
     --um-glass-alpha: 0.72;
-    --um-glass-bg: rgb(255 255 255 / var(--um-glass-alpha));
+    /* 底色的 rgb 三元组。`--um-glass-bg` 里的 var() 是在**声明处**（:root）就替换掉的，
+       子元素继承到的是替换后的字面值 —— 所以 GlassCard 想让站长的 `login_opacity`
+       生效（§5.3.1「覆写 --um-glass-alpha」），必须自己拿 tint + alpha 现算一次。 */
+    --um-glass-tint: 255 255 255;
+    --um-glass-bg: rgb(var(--um-glass-tint) / var(--um-glass-alpha));
+    /* 不透明度下限。平时 0（不起作用），失去 backdrop-filter 或用户要求高对比时抬高；
+       GlassCard 取 `max(alpha, min-alpha)`，这样即使站长把 login_opacity 调到 0.55，
+       兜底与高对比两条硬规则仍然压得住。 */
+    --um-glass-min-alpha: 0;
     --um-glass-blur: 20px;
     --um-glass-saturate: 160%;
     --um-glass-border: rgb(255 255 255 / 0.60);
@@ -377,6 +411,12 @@
     --um-particle-alpha: 0.08;
     --um-glow-from: rgb(110 86 207 / 0.06);
     --um-glow-dots: rgb(110 86 207 / 0.03);
+
+    /* 认证页压在站长背景图上的 scrim（§5.3.1 对比度守卫三件套之一：
+       卡片不透明度下限 + 这层 12% scrim + 表单控件用实色底）。
+       浅色用白：卡片是白玻璃，深色照片透上来会把卡内深色文字逼到 4.5:1 以下。
+       12% 只是「压一下」，真正兜住正文的是卡片下限（有背景图时 0.88，见 design/glass.js）。 */
+    --um-auth-scrim: rgb(255 255 255 / 0.12);
 }
 
 /* ============================================================================
@@ -460,7 +500,8 @@
     inset 0 1px 0 rgb(255 255 255 / .04);
 
     --um-glass-alpha: 0.64;
-    --um-glass-bg: rgb(20 20 22 / var(--um-glass-alpha));
+    --um-glass-tint: 20 20 22;
+    --um-glass-bg: rgb(var(--um-glass-tint) / var(--um-glass-alpha));
     --um-glass-blur: 24px;
     --um-glass-saturate: 140%;
     --um-glass-border: rgb(255 255 255 / 0.08);
@@ -471,16 +512,30 @@
     --um-particle-alpha: 0.14;
     --um-glow-from: rgb(110 86 207 / 0.05);
     --um-glow-dots: rgb(255 255 255 / 0.03);
+
+    /* 深色反过来用黑：卡片是 #141416 玻璃，亮照片透上来会把卡内白字压到不达标 */
+    --um-auth-scrim: rgb(10 10 11 / 0.12);
 }
 
 /* 无 backdrop-filter 时退化为近实色卡片，不做任何 JS 检测（§4.12） */
 @supports not (backdrop-filter: blur(1px)) {
     :root {
         --um-glass-alpha: 0.96;
+        --um-glass-min-alpha: 0.96;
     }
 
     :root.dark {
         --um-glass-alpha: 0.94;
+        --um-glass-min-alpha: 0.94;
+    }
+}
+
+/* 高对比偏好：玻璃一律按实色卡片渲染（§6.2 GlassCard 第三条）。
+   模糊与高光由 GlassCard 的 contrast-more:* 变体关掉，这里只管底色。 */
+@media (prefers-contrast: more) {
+    :root {
+        --um-glass-alpha: 1;
+        --um-glass-min-alpha: 1;
     }
 }
 
@@ -493,6 +548,16 @@
     --um-list-col-w: 380px;
     --um-picker-min-w: 320px;
     --um-topbar-h: 48px;
+    /* 顶栏通栏搜索（§5.1「max-width 640px，聚焦时 720px」）。同样归 Layer 3：
+       站长换了字标长度或站点名后，这两个值是最可能需要微调的。 */
+    --um-search-w: 640px;
+    --um-search-w-focus: 720px;
+    /* 命令条（§5.1「命令条（44px）」）。§4.4 的表里没列，但 AppShell 要减它算高度，
+       写死在组件里就没法跟 topbar 一起被站长覆盖，所以补进这一层。 */
+    --um-commandbar-h: 44px;
+    /* 移动端底部 Tab（§5.4 三项：邮件 / 邮箱 / 设置）。同上，§4.4 未列，取 56px
+       以对齐 sidebar 收起态与 iOS/Material 的拇指热区高度。 */
+    --um-tabbar-h: 56px;
     --um-row-h: 44px;
     --um-row-h-compact: 36px;
     --um-read-max-w: 720px;

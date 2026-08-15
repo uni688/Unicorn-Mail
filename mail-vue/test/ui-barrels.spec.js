@@ -1,7 +1,14 @@
-import {readdirSync, statSync} from 'node:fs'
+import {readdirSync, readFileSync, statSync} from 'node:fs'
 import {join} from 'node:path'
 import {describe, expect, it} from 'vitest'
+import {createPinia, setActivePinia} from 'pinia'
 import * as ui from '@/components/ui/index.js'
+
+// L2 桶里的 CommandPalette 顺着 `utils/day.js` 会在**模块顶层**就 `useSettingStore()`
+// （旧代码遗留），少了 pinia 是 import 那一刻就抛；静态 import 会被提升到这行之前。
+setActivePinia(createPinia())
+const composite = await import('@/components/composite/index.js')
+const domain = await import('@/components/domain/index.js')
 
 /**
  * 桶文件有 40 个，全靠手写维护 —— 漏加一个新组件，`import {X} from '@/components/ui'`
@@ -47,5 +54,50 @@ describe('components/ui 桶文件', () => {
             const mod = await import(`@/components/ui/${folder}/index.js`)
             expect(Object.keys(mod).length, folder).toBeGreaterThan(0)
         }
+    })
+})
+
+/**
+ * L2 / L3 的桶是平铺的（没有子目录），同一个静默 undefined 的坑照样存在 ——
+ * P2 起 `AppShell` / `CommandPalette` 这些是全站入口，漏导出直接白屏。
+ */
+const L2_DIRS = [
+    {dir: 'src/components/composite', barrel: composite, label: 'composite'},
+    {dir: 'src/components/domain', barrel: domain, label: 'domain'},
+]
+
+/** `*.spec.js` 与 `index.js` 不算组件 */
+function vueNames(dir) {
+    return readdirSync(dir)
+        .filter((file) => file.endsWith('.vue'))
+        .map((file) => file.replace(/\.vue$/, ''))
+        .sort()
+}
+
+describe('components/composite + components/domain 桶文件', () => {
+    for (const {dir, barrel, label} of L2_DIRS) {
+        it(`${label}/ 里的每个 .vue 都导出了，且没有多余导出`, () => {
+            expect(Object.keys(barrel).sort()).toEqual(vueNames(dir))
+        })
+
+        it(`${label}/ 导出的都是组件对象`, () => {
+            for (const [name, value] of Object.entries(barrel)) {
+                expect(value, name).toBeTypeOf('object')
+            }
+        })
+    }
+
+    /**
+     * `/_ds` 页头写着「共 N 个组件」。这两个数字是人手维护的，跟磁盘对不上时
+     * 页面就在说谎 —— 与其靠人记得改，不如让这里断言它们一致。
+     */
+    it('/_ds 上宣称的组件个数与磁盘一致', () => {
+        const src = readFileSync('src/views/design-system/index.vue', 'utf8')
+        const read = (name) => Number(src.match(new RegExp(`const ${name} = (\\d+)`))?.[1])
+
+        expect(read('COMPONENT_COUNT')).toBe(expected.length)
+        expect(read('COMPOSITE_COUNT')).toBe(
+            L2_DIRS.reduce((n, {dir}) => n + vueNames(dir).length, 0),
+        )
     })
 })

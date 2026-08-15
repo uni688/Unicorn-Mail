@@ -1,4 +1,5 @@
 import {describe, expect, it} from 'vitest'
+import {createI18n} from 'vue-i18n'
 import zh from '@/i18n/zh.js'
 import en from '@/i18n/en.js'
 import {UI_TEXT_FALLBACK, resolveUiText} from '@/components/ui/_shared/useUiText.js'
@@ -33,6 +34,39 @@ describe('ui.* i18n 与 UI_TEXT_FALLBACK 对齐', () => {
         for (const key of KEYS) {
             expect(/[一-龥]/.test(en.ui[key]), `en.ui.${key}`).toBe(false)
         }
+    })
+})
+
+describe('每条文案都能被 vue-i18n 编译', () => {
+    /**
+     * 消息编译是**惰性**的：`t()` 第一次取到某条文案时才编译，所以一条写坏的文案
+     * 只会在真的渲染到它的那一刻抛 SyntaxError —— 而 Vue 里这一抛会把整棵子树
+     * 撕掉。实测过一次：`shell.paletteHint` 里的裸 `@`（vue-i18n 的链接消息语法
+     * `@:key`）让整个命令面板渲染不出来，控制台只有一行 Invalid linked format。
+     *
+     * 这里把两种语言的每一条都过一遍编译器。裸 `@`、没配对的 `{`、`$` 之类的
+     * 语法坑都会在这里当场炸掉，而不是等到用户点开那个界面。
+     */
+    const leaves = (obj, prefix = '', out = []) => {
+        for (const [key, value] of Object.entries(obj)) {
+            const path = prefix ? `${prefix}.${key}` : key
+            if (value && typeof value === 'object') leaves(value, path, out)
+            else if (typeof value === 'string') out.push(path)
+        }
+        return out
+    }
+
+    it.each([['zh', zh], ['en', en]])('%s 的全部消息编译通过', (lang, messages) => {
+        const i18n = createI18n({legacy: false, locale: lang, messages: {[lang]: messages}})
+        const broken = []
+        for (const path of leaves(messages)) {
+            try {
+                i18n.global.t(path)
+            } catch (error) {
+                broken.push(`${lang}.${path}: ${error.message.split('\n')[0]}`)
+            }
+        }
+        expect(broken).toEqual([])
     })
 })
 

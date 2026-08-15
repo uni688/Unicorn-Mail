@@ -13,14 +13,15 @@
 import account from '@/layout/account/index.vue'
 import {useUiStore} from "@/store/ui.js";
 import {useSettingStore} from "@/store/setting.js";
-import {computed, onBeforeUnmount, onMounted, watch} from "vue";
+import {computed, watch} from "vue";
 import { useRoute } from 'vue-router'
 import { hasPerm } from "@/perm/perm.js"
+import { useBreakpoint } from '@/composables/useBreakpoint.js'
 
 const settingStore = useSettingStore()
 const uiStore = useUiStore();
 const route = useRoute()
-let  innerWidth =  window.innerWidth
+const { mdAndUp } = useBreakpoint()
 
 let elNotification = null
 
@@ -81,23 +82,16 @@ function showNotice(data) {
   })
 }
 
-onMounted(() => {
-  window.addEventListener('resize', handleResize)
-  handleResize()
-})
-
-onBeforeUnmount(() => {
-  window.removeEventListener('resize', handleResize)
-})
-
-const handleResize = () => {
+/*
+ * 旧实现是一个 window resize 监听 + 自己记 innerWidth，只为判断「有没有跨过 767」。
+ * 换成 useBreakpoint 的 mdAndUp（=768，与 --breakpoint-md 同源）：matchMedia 只在
+ * 真正跨断点时回调，语义与旧的「宽度变了才动」一致，也不再和 AppShell 各留一个监听。
+ */
+watch(mdAndUp, (value) => {
   if (['content','email','send'].includes(route.meta.name)) {
-    if (innerWidth !==  window.innerWidth) {
-      innerWidth = window.innerWidth;
-      uiStore.accountShow = window.innerWidth >= 767;
-    }
+    uiStore.accountShow = value
   }
-}
+})
 
 </script>
 <style lang="scss" scoped>
@@ -147,7 +141,9 @@ const handleResize = () => {
 .main-box-show {
   display: grid;
   grid-template-columns: 260px  1fr;
-  height: calc(100% - 60px);
+  /* 旧值是 calc(100% - 60px)（减掉旧的 60px el-header）。AppShell 已经把顶栏/命令条
+     排在 flex 列里，插槽拿到的就是剩余高度，这里必须是 100%，否则底部空出 60px。 */
+  height: 100%;
   @media (max-width: 767px) {
     grid-template-columns: 1fr;
   }
@@ -156,7 +152,7 @@ const handleResize = () => {
 .main-box-hide {
   display: grid;
   grid-template-columns: 1fr;
-  height: calc(100% - 60px);
+  height: 100%;
 }
 
 

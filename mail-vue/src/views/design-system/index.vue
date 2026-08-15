@@ -5,7 +5,7 @@
       style="height: var(--um-topbar-h)"
     >
       <span class="text-title">Design System</span>
-      <span class="rounded-sm bg-accent-subtle px-2 py-px text-micro uppercase text-accent-subtle-fg">P0 · P1</span>
+      <span class="rounded-sm bg-accent-subtle px-2 py-px text-micro uppercase text-accent-subtle-fg">P0 · P1 · P2</span>
       <span class="ml-auto text-caption text-fg-muted">断点 {{ current }}</span>
       <div class="flex items-center gap-0.5 rounded-md bg-inset p-0.5">
         <button
@@ -114,14 +114,16 @@
         <h2 class="text-title-lg">材质</h2>
         <p class="mt-1 text-caption text-fg-muted">
           玻璃只有 4 个使用面，token 只允许 GlassCard / Overlay / ParticleField 读取（§4.12）。
+          全部变体与 §9.5 的 8 种组合在下面的
+          <a class="text-accent-fg hover:underline" href="#glasscard">L2 复合层</a>。
         </p>
         <div class="glass-demo mt-4">
-          <div class="glass-card">
+          <GlassCard class="max-w-80 p-(--um-card-p)">
             <div class="text-title">GlassCard 预览</div>
             <div class="mt-1 text-caption text-fg-muted">
               alpha {{ isDark ? '0.64' : '0.72' }} · blur {{ isDark ? '24px' : '20px' }}
             </div>
-          </div>
+          </GlassCard>
         </div>
       </section>
 
@@ -156,6 +158,25 @@
       <DsForms />
       <DsOverlays />
       <DsNavigation />
+
+      <section id="composite" class="scroll-mt-20">
+        <h2 class="text-title-lg">L2 复合层</h2>
+        <p class="mt-1 text-caption text-fg-muted">
+          §10.2 的 `components/composite` + `components/domain` 共 {{ COMPOSITE_COUNT }} 个组件：材质、导航壳零件、
+          联体表单控件与两个全局浮层。整壳（Topbar + Sidebar + CommandBar 三段联动）要登录态，走
+          <code class="font-mono text-mono">/mail/inbox</code> 人工过审，这里只列能单独成立的零件。
+        </p>
+        <nav class="mt-4 flex flex-wrap gap-1.5" aria-label="复合组件目录">
+          <a
+            v-for="link in TOC_L2"
+            :key="link.id"
+            :href="`#${link.id}`"
+            class="rounded-sm bg-inset px-2 py-1 font-mono text-mono text-fg-muted transition-colors hover:bg-hover hover:text-fg"
+          >{{ link.label }}</a>
+        </nav>
+      </section>
+
+      <DsShell />
     </main>
   </div>
 </template>
@@ -164,11 +185,13 @@
 import {onMounted, ref} from 'vue'
 import {THEME_MODES, useTheme} from '@/composables/useTheme.js'
 import {useBreakpoint} from '@/composables/useBreakpoint.js'
+import {GlassCard} from '@/components/composite'
 import DsActions from './sections/DsActions.vue'
 import DsDisplay from './sections/DsDisplay.vue'
 import DsForms from './sections/DsForms.vue'
 import DsOverlays from './sections/DsOverlays.vue'
 import DsNavigation from './sections/DsNavigation.vue'
+import DsShell from './sections/DsShell.vue'
 
 const {mode, isDark, setMode} = useTheme()
 const {current} = useBreakpoint()
@@ -177,6 +200,9 @@ const modeLabel = {light: '浅色', dark: '深色', system: '跟随系统'}
 
 /** `src/components/ui/**\/*.vue` 的个数；`test/ui-barrels.spec.js` 守着别漏导出 */
 const COMPONENT_COUNT = 50
+
+/** `composite/` + `domain/` 的个数；同一个测试也守着这两个桶 */
+const COMPOSITE_COUNT = 15
 
 /** 目录锚点，顺序与下面五个 section 文件的渲染顺序一致 */
 const TOC = [
@@ -218,6 +244,19 @@ const TOC = [
   {id: 'scrollarea', label: 'ScrollArea'},
   {id: 'pagination', label: 'Pagination'},
   {id: 'tree', label: 'Tree'},
+]
+
+/** L2 目录，顺序与 `DsShell.vue` 里的区块一致 */
+const TOC_L2 = [
+  {id: 'glasscard', label: 'GlassCard'},
+  {id: 'authcard', label: '登录卡材质 ×8'},
+  {id: 'particlefield', label: 'ParticleField'},
+  {id: 'brandmark', label: 'BrandMark'},
+  {id: 'sidebaritem', label: 'SidebarGroup/Item'},
+  {id: 'commandbar', label: 'CommandBar'},
+  {id: 'authinputs', label: 'Email/PasswordInput'},
+  {id: 'miniquota', label: 'MiniQuota'},
+  {id: 'palette', label: 'CommandPalette / ?'},
 ]
 
 const semantic = [
@@ -300,22 +339,12 @@ onMounted(() => {
 
 <style scoped>
 /* 只有 GlassCard / Overlay / ParticleField 允许读玻璃 token（§4.12）。
-   这里是 P0 的预览占位，P2 会换成真正的 GlassCard 组件。 */
+   这里只留背板：卡片本体从 P2 起就是真的 GlassCard 组件了。 */
 .glass-demo {
   padding: 40px;
   border-radius: var(--um-radius-xl);
   background:
       radial-gradient(120% 120% at 20% 0%, var(--um-glow-from), transparent 60%),
       linear-gradient(135deg, var(--um-chart-1), var(--um-chart-4));
-}
-
-.glass-card {
-  max-width: 320px;
-  padding: var(--um-card-p);
-  border: 1px solid var(--um-glass-border);
-  border-radius: var(--um-radius-lg);
-  background: var(--um-glass-bg);
-  backdrop-filter: blur(var(--um-glass-blur)) saturate(var(--um-glass-saturate));
-  box-shadow: var(--um-glass-shadow), inset 0 1px 0 var(--um-glass-highlight);
 }
 </style>

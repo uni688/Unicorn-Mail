@@ -190,34 +190,56 @@ describe('fg-subtle 只给非文本用', () => {
     })
 })
 
-describe('侧栏文字必须跟着 --aside-backgound 走', () => {
+describe('旧侧栏 / 旧顶栏已由 L2 外壳取代', () => {
     /**
-     * P0 把 --aside-backgound 从深蓝 #001529 改成了浅色 --um-sidebar-bg（§4.6），
-     * 而旧侧栏把文字写死成白色 —— 浅色底 + 白字 = 整条导航看不见。
-     * 这里锁住「侧栏文字只能来自 token」，避免哪天又被改回 #fff。
+     * P0 的护栏是「旧 `layout/aside` 的 el-menu 文字必须跟着 --aside-backgound 走」
+     * （深蓝底改浅底后白字会看不见）。P2 把 `layout/aside`、`layout/header` 整个删掉，
+     * 换成 `composite/Sidebar.vue` + `composite/Topbar.vue`，那条护栏也就失去了对象。
+     * 换成两条仍然有效的：旧文件不许回来（回来就意味着又有一份写死颜色的导航），
+     * 以及新外壳里不许出现写死的颜色。
      */
-    const aside = read('src/layout/aside/index.vue')
+    const EXISTS = new Set(FILES)
 
-    it('el-menu 的 text-color / active-text-color 用 token 而不是写死颜色', () => {
-        for (const attr of ['text-color', 'active-text-color']) {
-            const m = new RegExp(`${attr}="([^"]+)"`).exec(aside)
-            expect(m, `<el-menu> 上找不到 ${attr}`).not.toBeNull()
-            expect(m[1], `${attr} 写死了颜色`).toMatch(/var\(--um-/)
+    it('旧 layout/aside 与 layout/header 不再存在', () => {
+        for (const rel of [join('src', 'layout', 'aside', 'index.vue'), join('src', 'layout', 'header', 'index.vue')]) {
+            expect(EXISTS.has(rel), `${rel} 又出现了：导航只应该有 composite/ 里那一份`).toBe(false)
         }
     })
 
-    it('管理分组标题、分割线文字、选中态都不再硬编码白色', () => {
-        const blocks = ['.manage-title', ':deep(.el-divider__text)', '.choose-item']
-        for (const sel of blocks) {
-            const start = aside.indexOf(sel)
-            expect(start, `${sel} 不在侧栏样式里了`).toBeGreaterThan(-1)
-            const body = aside.slice(start, aside.indexOf('}', start))
-            const color = /(?:^|[\s;])color:\s*([^;]+)/.exec(body)
-            if (!color) continue
-            expect(color[1].trim(), `${sel} 的 color 仍是写死的白`).toMatch(/var\(--um-/)
+    /**
+     * 材质层（GlassCard / ParticleField）是唯一允许把颜色拼成字符串的地方：玻璃底色是
+     * `rgb(var(--um-glass-tint) / …)`，canvas 的 fillStyle 只能吃计算值，还需要一个
+     * 读不到 token 时的兜底常量。导航壳没有这种需求，一律走工具类。
+     */
+    const MATERIAL = new Set(['GlassCard.vue', 'ParticleField.vue'])
+    const COMMENT_LINE = /^\s*(\/\/|\/\*|\*)/
+
+    it('导航壳组件不写死颜色（只用 token 工具类）', () => {
+        const COLOR = /#[0-9A-Fa-f]{3,8}\b|\b(rgb|rgba|hsl|hsla|oklch|color-mix)\(/
+        const offenders = []
+        for (const [file, code] of SOURCES) {
+            if (!file.startsWith(join('src', 'components', 'composite'))) continue
+            if (MATERIAL.has(file.split(/[\\/]/).pop())) continue
+            code.split('\n').forEach((line, i) => {
+                if (COMMENT_LINE.test(line) || !COLOR.test(line)) return
+                offenders.push(`${file}:${i + 1} ${line.trim().slice(0, 90)}`)
+            })
         }
-        // 选中态与 hover 的底色也要用 token（旧值 rgba(255,255,255,.08) 在浅底上等于没有）
-        expect(aside).not.toMatch(/background:\s*rgba\(255,\s*255,\s*255,\s*0?\.08\)/)
+        expect(offenders).toEqual([])
+    })
+
+    it('材质层的颜色也来自 token（canvas 兜底常量除外）', () => {
+        for (const name of MATERIAL) {
+            const code = read(join('src', 'components', 'composite', name))
+            for (const m of code.matchAll(/\brgba?\(([^)]*)\)/g)) {
+                // `${…}` 是运行期从 getComputedStyle 读回来的 token 值
+                if (m[1].includes('${')) continue
+                // ParticleField 的 fill 兜底：token 读不到时用一次 accent 的字面值
+                if (/^[\d\s./]+$/.test(m[1])) continue
+                expect(m[0], `${name} 里有不来自 token 的颜色`).toMatch(/var\(--um-/)
+            }
+            expect(code, `${name} 不许出现 hex 字面色`).not.toMatch(/#[0-9A-Fa-f]{6}\b/)
+        }
     })
 })
 

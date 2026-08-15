@@ -94,9 +94,9 @@
     --base-fill: var(--um-bg-hover);
     --header-actions-border: inset 0 -1px 0 0 var(--um-border-default);
 
-    /* 侧栏由深蓝 #001529 改为浅色 sidebar-bg，并去掉那道 3px 深蓝投影（§4.6） */
-    --aside-backgound: var(--um-sidebar-bg);
-    --aside-right-border: var(--um-shadow-lg);
+    /* P0 把 `--aside-backgound`（原拼写错误）与 `--aside-right-border` 从深蓝 #001529
+       改成了浅色；P2 删掉旧 `layout/aside`/`layout/header` 之后两者再无引用，一并移除。
+       新侧栏是 `composite/Sidebar.vue`，直接吃 `bg-sidebar` 工具类。 */
 
     --loadding-background: color-mix(in oklab, var(--um-bg-canvas) 80%, transparent);
     --regular-text-color: var(--um-fg-muted);

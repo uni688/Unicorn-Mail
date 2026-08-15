@@ -29,6 +29,27 @@ if (typeof Element !== 'undefined') {
     }
 }
 
+/**
+ * matchMedia：jsdom 至今不实现，而 P2 的 `useTheme` / `useBreakpoint` / `useBgEffect`
+ * 在**模块顶层**就要读它（主题初始化、断点单例），少了它是 import 时就抛。
+ *
+ * 恒为 `false` 等于「Light + 桌面指针 + 不减少动效 + 最窄断点」这一档默认环境，
+ * 和 jsdom 其余默认值（innerWidth 1024、无 GPU）一致。要测另一档的组件自己覆盖它，
+ * 见 `Toast/Toaster.spec.js` —— 那里 beforeEach 换掉、afterEach 还回去。
+ */
+if (typeof window !== 'undefined' && !window.matchMedia) {
+    window.matchMedia = (query) => ({
+        matches: false,
+        media: String(query),
+        onchange: null,
+        addEventListener() {},
+        removeEventListener() {},
+        addListener() {},
+        removeListener() {},
+        dispatchEvent: () => false,
+    })
+}
+
 if (!globalThis.ResizeObserver) {
     globalThis.ResizeObserver = class ResizeObserver {
         observe() {}

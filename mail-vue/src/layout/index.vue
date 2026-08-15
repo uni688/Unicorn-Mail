@@ -1,125 +1,42 @@
-<template>
-  <el-container class="layout">
-    <el-aside
-        class="aside"
-        :class="uiStore.asideShow ? 'aside-show' : 'el-aside-hide'">
-      <Aside />
-    </el-aside>
-    <div
-        :class="(uiStore.asideShow && isMobile)? 'overlay-show':'overlay-hide'"
-        @click="uiStore.asideShow = false"
-    ></div>
-    <el-container class="main-container">
-      <el-main>
-        <el-header>
-            <Header />
-        </el-header>
-        <Main />
-      </el-main>
-    </el-container>
-  </el-container>
-  <writer ref="writerRef" />
-</template>
-
 <script setup>
-import Aside from '@/layout/aside/index.vue'
-import Header from '@/layout/header/index.vue'
+/**
+ * layout —— 登录后的框架路由组件
+ *
+ * P2 把这里从 `el-container` 三段式换成 `AppShell`（§10.4）：顶栏、侧栏、命令条、
+ * 底部 Tab、命令面板、`?` 面板全都在 AppShell 里，这一层只剩两件事 ——
+ * 把旧的 `Main`（账号浮层 + keep-alive 的 router-view）塞进 shell 的插槽，
+ * 以及把写信面板的 ref 交给 store（`uiStore.writerRef`，全站的「新邮件 / 回复 /
+ * 转发」都调它，见 `email-scroll`、`views/content`、`CommandBar`）。
+ *
+ * 旧的 `layout/aside/index.vue` 与 `layout/header/index.vue` 由 `Sidebar` / `Topbar`
+ * 取代，已删除；`layout/main/index.vue` 与 `layout/account/index.vue` 按 §10.7
+ * 「在此之前保留旧 `account/index.vue` 作为过渡入口」保留，等 P3 的三栏邮件视图与
+ * MailboxPicker 上线再拆。
+ *
+ * 侧栏的显示/折叠不再由 `uiStore.asideShow` 驱动（那是旧左滑抽屉的开关），
+ * AppShell 自己按断点 + 用户偏好决定。
+ *
+ * `writer` 是 `position: fixed` + `v-show`，放在 shell 外面是故意的：shell 根节点是
+ * `overflow-hidden` 的 flex 列，写信面板不该参与它的布局计算。
+ */
+import {onMounted, ref} from 'vue'
+import {AppShell} from '@/components/composite'
 import Main from '@/layout/main/index.vue'
-import { ref, onMounted, onBeforeUnmount } from 'vue'
-import {useUiStore} from "@/store/ui.js";
 import writer from '@/layout/write/index.vue'
+import {useUiStore} from '@/store/ui.js'
 
-const uiStore = useUiStore();
-const writerRef = ref({})
-const isMobile = ref(window.innerWidth < 1025)
-const handleResize = () => {
-  isMobile.value = window.innerWidth < 1025
-  uiStore.asideShow = window.innerWidth > 1024;
-}
+const uiStore = useUiStore()
+/** 初值 `null` 而不是 `{}`：`{}` 是真值，会让「新邮件」在挂载前就被认为可用 */
+const writerRef = ref(null)
 
 onMounted(() => {
-  uiStore.writerRef = writerRef
-
-  window.addEventListener('resize', handleResize)
-  handleResize()
-})
-
-onBeforeUnmount(() => {
-  window.removeEventListener('resize', handleResize)
+    uiStore.writerRef = writerRef
 })
 </script>
 
-<style lang="scss" scoped>
-.el-aside-hide {
-  position: fixed;
-  left: 0;
-  height: 100%;
-  z-index: 100;
-  transform: translateX(-100%);
-  transition: all 100ms ease;
-}
-
-.aside-show {
-  -webkit-box-shadow: var(--aside-right-border);
-  box-shadow: var(--aside-right-border);
-  transform: translateX(0);
-  transition: all 100ms ease;
-  z-index: 101;
-  @media (max-width: 1025px) {
-    position: fixed;
-    top: 0;
-    left: 0;
-    z-index: 101;
-    height: 100%;
-    background: var(--el-bg-color);
-  }
-}
-
-.el-aside {
-  width: auto;
-  transition: all 100ms ease;
-}
-
-.layout {
-  height: 100%;
-  position: fixed;
-  width: 100%;
-  top: 0;
-  left: 0;
-  overflow: hidden;
-}
-
-.main-container {
-  min-height: 100%;
-  background: var(--el-bg-color);
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-}
-
-.el-main {
-  padding: 0;
-}
-
-.el-header {
-  background: var(--el-bg-color);
-  border-bottom: solid 1px var(--el-border-color);
-  padding: 0 0 0 0;
-}
-
-.overlay-show {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
-  background: rgba(0, 0, 0, 0.4);
-  z-index: 99;
-  transition: all 0.3s;
-}
-
-.overlay-hide {
-  display: flex;
-  pointer-events: none;
-  opacity: 0;
-}
-</style>
+<template>
+  <AppShell>
+    <Main />
+  </AppShell>
+  <writer ref="writerRef" />
+</template>
