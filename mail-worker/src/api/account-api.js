@@ -32,3 +32,10 @@ app.put('/account/setAsTop', async (c) => {
 	await accountService.setAsTop(c, await c.req.json(), userContext.getUserId(c));
 	return c.json(result.ok());
 });
+
+// P3 增量 6（§10.5）：MailboxPicker 的服务端搜索。/account/list 是纯游标分页，没有 keyword。
+// 权限跟 /account/list 同一个键（account:query），见 security.js
+app.get('/account/search', async (c) => {
+	const list = await accountService.searchByKeyword(c, c.req.query(), userContext.getUserId(c));
+	return c.json(result.ok(list));
+});

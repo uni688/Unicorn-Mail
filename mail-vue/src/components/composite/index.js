@@ -19,6 +19,8 @@ export {default as CommandBar} from './CommandBar.vue'
 export {default as Sidebar} from './Sidebar.vue'
 export {default as SidebarGroup} from './SidebarGroup.vue'
 export {default as SidebarItem} from './SidebarItem.vue'
+export {default as FolderTree} from './FolderTree.vue'
+export {default as MailboxPicker} from './MailboxPicker.vue'
 export {default as TabBar} from './TabBar.vue'
 
 /* ------------------------------------------------------------------ 表单 */
@@ -29,3 +31,8 @@ export {default as PasswordInput} from './PasswordInput.vue'
 /* ------------------------------------------------------------------ 浮层 */
 export {default as CommandPalette} from './CommandPalette.vue'
 export {default as ShortcutsDialog} from './ShortcutsDialog.vue'
+
+/* ------------------------------------------------------------------ 状态 */
+/* §7.8 状态矩阵的「空 / 错」两档，列表、搜索结果、回收站共用 */
+export {default as EmptyState} from './EmptyState.vue'
+export {default as ErrorState} from './ErrorState.vue'

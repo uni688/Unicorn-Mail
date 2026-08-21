@@ -24,7 +24,12 @@ const exclude = [
 const requirePerms = [
 	'/email/send',
 	'/email/delete',
+	// P3 增量 2：物理删除（清空回收站），和 /email/delete 同一个权限键
+	'/email/purge',
 	'/account/list',
+	// P3 增量 6：MailboxPicker 的服务端搜索，和 /account/list 同一个权限键。
+	// 不加这一行的话，没有 account:query 的角色也能列出自己全部邮箱
+	'/account/search',
 	'/account/delete',
 	'/account/add',
 	'/my/delete',
@@ -62,10 +67,10 @@ const requirePerms = [
 ];
 
 const premKey = {
-	'email:delete': ['/email/delete'],
+	'email:delete': ['/email/delete', '/email/purge'],
 	'email:send': ['/email/send'],
 	'account:add': ['/account/add'],
-	'account:query': ['/account/list'],
+	'account:query': ['/account/list', '/account/search'],
 	'account:delete': ['/account/delete'],
 	'my:delete': ['/my/delete'],
 	'role:add': ['/role/add'],

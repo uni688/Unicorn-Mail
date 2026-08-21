@@ -8,7 +8,8 @@
  *
  * 三个落点都用**路由名**判定存在性（`router.hasRoute`）：
  * - 邮件 → `email`
- * - 邮箱 → 旧账号浮层（`uiStore.accountShow`），这是 §10.7 认可的过渡入口；
+ * - 邮箱 → 命令面板的 `@` 模式（P3 起；移动端没有侧栏，`MailboxPicker` 挂在侧栏里，
+ *   而 `@` 模式和 Picker 共用 `useMailboxes()`，选出来的状态一模一样）；
  *   `manyEmail !== 0` 或没有 `account:query` 时这一格**不出现**（点了不会有反应的格子
  *   比少一格更糟），此时底部就是 2 格。
  * - 设置 → `setting`
@@ -22,8 +23,8 @@ import {useI18n} from 'vue-i18n'
 import IconInbox from '~icons/lucide/inbox'
 import IconAtSign from '~icons/lucide/at-sign'
 import IconSettings from '~icons/lucide/settings'
-import {useUiStore} from '@/store/ui.js'
 import {useSettingStore} from '@/store/setting.js'
+import {openPalette} from '@/composables/useCommandPalette.js'
 import {hasPerm} from '@/perm/perm.js'
 import {cn} from '@/utils/cn.js'
 
@@ -34,7 +35,6 @@ const props = defineProps({
 const {t} = useI18n()
 const route = useRoute()
 const router = useRouter()
-const uiStore = useUiStore()
 const settingStore = useSettingStore()
 
 /** 「邮件」高亮的路由集合：列表与正文都算在邮件里（§5.4 移动端是列表 → 正文的推入式） */
@@ -53,7 +53,7 @@ const tabs = computed(() => {
     if (canSwitch.value) {
         out.push({
             key: 'mailboxes', label: t('shell.tabMailboxes'), icon: IconAtSign,
-            action: () => { uiStore.accountShow = true }, active: false,
+            action: () => openPalette('@'), active: false,
         })
     }
     if (router.hasRoute('setting')) {

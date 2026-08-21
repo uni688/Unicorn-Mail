@@ -45,6 +45,7 @@ import {useHotkeys} from '@/composables/useHotkeys.js'
 import {useTheme} from '@/composables/useTheme.js'
 import {openPalette, recordVisit, togglePalette} from '@/composables/useCommandPalette.js'
 import {openShortcuts} from '@/composables/useShortcutsDialog.js'
+import {useMailActions} from '@/composables/useMailActions.js'
 import {useUiStore} from '@/store/ui.js'
 import {useSettingStore} from '@/store/setting.js'
 import {hasPerm} from '@/perm/perm.js'
@@ -61,6 +62,8 @@ const {t} = useI18n()
 const route = useRoute()
 const router = useRouter()
 const uiStore = useUiStore()
+/** 命令条的上下文动作作用于当前邮件列表（§6.2），那根线在 useMailActions 里 */
+const mailActions = useMailActions()
 const settingStore = useSettingStore()
 const {isMobile, mdAndUp, isWide} = useBreakpoint()
 const {toggle: toggleTheme} = useTheme()
@@ -124,11 +127,15 @@ watch(() => route.name, () => recordVisit(route), {immediate: true})
 /** 命令条只在邮件视图出现：它的动作全部作用于邮件列表（§6.2） */
 const showCommandBar = computed(() => route.meta.mail === true)
 
-/** 旧账号浮层在 `< md` 是带遮罩的浮层，却没有 Esc —— Esc 在这里补上 */
-const accountOverlayOpen = computed(() => uiStore.accountShow && settingStore.settings.manyEmail === 0)
-
+/**
+ * 「切换邮箱」的落点（P3）：
+ *   桌面 —— 侧栏里的 `MailboxPicker`；键盘走命令面板的 `@` 模式最快，两者共用
+ *           `useMailboxes()`，选出来的状态一样。
+ *   窄屏 —— 侧栏本身不渲染，所以也走 `@` 模式。
+ * 旧的 `uiStore.accountShow` 浮层连同它的 Esc 补丁一起删了（§10.7 的过渡到此结束）。
+ */
 function openMailboxes() {
-    uiStore.accountShow = true
+    openPalette('@')
 }
 
 function go(name) {
@@ -154,26 +161,9 @@ useHotkeys([
         when: () => hasPerm('email:send') && !!uiStore.writerRef,
         run: () => uiStore.writerRef?.open?.(),
     },
-    // P2 只有旧账号浮层这一个落点，所以「切换邮箱」与「邮箱管理」暂时同一个动作；
-    // P3 的 MailboxPicker 上线后前者改为聚焦 Picker（§5.1）
+    // 「切换邮箱」与「邮箱管理」都进 `@` 模式：一个入口，一套状态
     {id: 'mailbox-picker', when: () => canSwitchMailbox.value, run: openMailboxes},
     {id: 'go-mailboxes', when: () => canSwitchMailbox.value, run: openMailboxes},
-    {
-        id: 'escape',
-        /*
-         * 浮层自己的 Esc 由 reka/vaul 处理（它们会 preventDefault，轮不到这里）；
-         * 这一条只管旧账号浮层，并且不吞掉原生行为。
-         *
-         * 桌面端也收：那边浮层是并排的一列，而**关闭按钮长在旧邮件列表头上**
-         * （`email-scroll/index.vue`）—— 从侧栏当前邮箱行或 `g m` 在设置页打开它，
-         * 页面上就找不到任何能关掉它的东西。P3 的 MailboxPicker 上线后这条连同
-         * `accountShow` 一起删。
-         */
-        preventDefault: false,
-        run: () => {
-            if (accountOverlayOpen.value) uiStore.accountShow = false
-        },
-    },
 ])
 </script>
 
@@ -200,7 +190,14 @@ useHotkeys([
       />
 
       <div class="flex min-w-0 flex-1 flex-col">
-        <CommandBar v-if="showCommandBar" />
+        <CommandBar
+          v-if="showCommandBar"
+          :selected-count="mailActions.count.value"
+          @mark-read="mailActions.run('mark-read')"
+          @star="mailActions.run('star')"
+          @delete="mailActions.run('delete')"
+          @copy-code="mailActions.run('copy-code')"
+        />
         <main id="um-main" class="min-h-0 flex-1 overflow-hidden">
           <slot />
         </main>

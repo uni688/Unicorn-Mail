@@ -1,156 +1,132 @@
-<template>
-  <emailScroll ref="scroll"
-               :cancel-success="cancelStar"
-               :star-success="addStar"
-               :getEmailList="getEmailList"
-               :emailDelete="emailDelete"
-               :star-add="starAdd"
-               :star-cancel="starCancel"
-               :time-sort="params.timeSort"
-               :email-read="emailRead"
-               :show-unread="true"
-               actionLeft="4px"
-               @jump="jumpContent"
-  >
-    <template #first>
-      <Icon class="icon" @click="changeTimeSort" icon="material-symbols-light:timer-arrow-down-outline"
-            v-if="params.timeSort === 0" width="28" height="28"/>
-      <Icon class="icon" @click="changeTimeSort" icon="material-symbols-light:timer-arrow-up-outline" v-else
-            width="28" height="28"/>
-    </template>
-
-  </emailScroll>
-</template>
-
 <script setup>
-import {useAccountStore} from "@/store/account.js";
-import {useEmailStore} from "@/store/email.js";
-import {useSettingStore} from "@/store/setting.js";
-import emailScroll from "@/components/email-scroll/index.vue"
-import {emailList, emailDelete, emailLatest, emailRead} from "@/request/email.js";
-import {starAdd, starCancel} from "@/request/star.js";
-import {defineOptions, h, onMounted, reactive, ref, watch} from "vue";
-import {sleep} from "@/utils/time-utils.js";
-import router from "@/router/index.js";
-import {Icon} from "@iconify/vue";
-import { useRoute } from 'vue-router'
+/**
+ * 收件箱（§7.4 / §7.5）
+ *
+ * 这一版只剩「取哪一批数据」和「新邮件长轮询」两件事，列表、阅读窗格、选择、删除、
+ * 已读全在 `MailWorkspace` 里（旧版是 `email-scroll` 1367 行 + `views/content` 428 行）。
+ *
+ * 长轮询照搬旧实现（`views/email/index.vue:77-131`）的每一条防御，它们都是踩过的坑：
+ *   - 请求发出时校验「最后一封属于当前邮箱」，回来后再校验一次邮箱 / 排序没变；
+ *   - `existIds` 去重：`/email/latest` 在边界上会重复给同一封；
+ *   - 401/403 直接把 autoRefresh 关掉，否则会以固定间隔一直撞墙；
+ *   - 每插一封停 50ms，让插入动画一封一封出现。
+ * 改动只有一处：循环条件从 `while (true)` 改成组件存活标记，卸载后不再空转
+ * （旧实现里这个循环会随页面一直跑到刷新为止）。
+ */
+import {onMounted, onUnmounted, ref} from 'vue'
+import {useI18n} from 'vue-i18n'
+import {useRoute} from 'vue-router'
+import {MailWorkspace} from '@/components/domain'
+import {emailDelete, emailLatest, emailList} from '@/request/email.js'
+import {starAdd, starCancel} from '@/request/star.js'
+import {useAccountStore} from '@/store/account.js'
+import {useSettingStore} from '@/store/setting.js'
+import {useMailPrefs} from '@/composables/useMailPrefs.js'
+import {useUiStore} from '@/store/ui.js'
+import {sleep} from '@/utils/time-utils.js'
 
-defineOptions({
-  name: 'email'
-})
+defineOptions({name: 'email'})
 
-const route = useRoute();
-const emailStore = useEmailStore();
-const accountStore = useAccountStore();
-const settingStore = useSettingStore();
-const scroll = ref({})
-const params = reactive({
-  timeSort: 0,
-})
+const {t} = useI18n()
+const route = useRoute()
+const accountStore = useAccountStore()
+const settingStore = useSettingStore()
+const uiStore = useUiStore()
+const {prefs} = useMailPrefs()
 
-onMounted(() => {
-  emailStore.emailScroll = scroll;
-  latest()
-})
+const workspace = ref(null)
 
-
-watch(() => accountStore.currentAccountId, () => {
-  scroll.value.refreshList();
-})
-
-function changeTimeSort() {
-  params.timeSort = params.timeSort ? 0 : 1
-  scroll.value.refreshList();
+function fetchList(cursor, size) {
+    const accountId = accountStore.currentAccountId
+    const allReceive = accountStore.currentAccount?.allReceive
+    return emailList(accountId, allReceive, cursor, prefs.timeSort, size, 0).then((data) => {
+        if (data?.latestEmail) {
+            // 长轮询要靠这两个字段判断「这一批还属于当前邮箱吗」
+            data.latestEmail.reqAccountId = accountId
+            data.latestEmail.allReceive = allReceive
+        }
+        return data
+    })
 }
 
-function jumpContent(email) {
-  emailStore.contentData.email = email
-  emailStore.contentData.delType = 'logic'
-  emailStore.contentData.showUnread = true
-  emailStore.contentData.showStar = true
-  emailStore.contentData.showReply = true
-  router.push({name: 'content'})
-}
+/* -------------------------------------------------------------- 长轮询 */
 
-const existIds = new Set();
+const existIds = new Set()
+let alive = true
 
 async function latest() {
-  while (true) {
+    while (alive) {
+        const autoRefresh = settingStore.settings.autoRefresh
+        await sleep(autoRefresh > 1 ? autoRefresh * 1000 : 3000)
 
-    let autoRefresh = settingStore.settings.autoRefresh;
-    await sleep(autoRefresh > 1 ? autoRefresh * 1000 : 3000);
+        if (!alive || route.name !== 'email' || autoRefresh <= 1) continue
+        if (workspace.value?.firstLoad) continue
 
-    if (route.name !== 'email') {
-      continue;
-    }
-
-    const latestId = scroll.value.latestEmail?.emailId
-
-    if (!scroll.value.firstLoad && autoRefresh > 1) {
-      try {
+        const latestEmail = workspace.value?.latestEmail
         const accountId = accountStore.currentAccountId
-        const allReceive = scroll.value.latestEmail?.allReceive
-        const curTimeSort = params.timeSort
-        let list = []
+        const allReceive = latestEmail?.allReceive
+        const sort = prefs.timeSort
 
-        //确保发起请求时最后一个邮件是当前账号的,或者
-        if (accountId === scroll.value.latestEmail?.reqAccountId) {
-          list = await emailLatest(latestId, accountId, allReceive);
-        }
+        // 发起前：最后一封必须是当前邮箱的
+        if (!latestEmail || accountId !== latestEmail.reqAccountId) continue
 
-        //确保请求回来后，账号没有切换，时间排序没有改变，全部邮件类型没变
-        if (accountId === accountStore.currentAccountId && params.timeSort === curTimeSort && allReceive === accountStore.currentAccount.allReceive) {
-          if (list.length > 0) {
+        try {
+            const list = await emailLatest(latestEmail.emailId, accountId, allReceive)
 
-            for (let email of list) {
+            // 回来后：邮箱、排序、「全部邮件」范围都没变才允许回填
+            if (accountId !== accountStore.currentAccountId
+                || sort !== prefs.timeSort
+                || allReceive !== accountStore.currentAccount?.allReceive) continue
 
-              email.reqAccountId = accountId;
-              email.allReceive = allReceive;
-
-              if (!existIds.has(email.emailId)) {
-
+            for (const email of list ?? []) {
+                if (existIds.has(email.emailId)) continue
                 existIds.add(email.emailId)
-                scroll.value.addItem(email)
-
+                email.reqAccountId = accountId
+                email.allReceive = allReceive
+                workspace.value?.addItem(email)
                 await sleep(50)
-              }
-
             }
-
-          }
-
+        } catch (e) {
+            if (e?.code === 401 || e?.code === 403) settingStore.settings.autoRefresh = 0
+            console.error(e)
         }
-      } catch (e) {
-        if (e.code === 401 || e.code === 403) {
-          settingStore.settings.autoRefresh = 0;
-        }
-        console.error(e)
-      }
     }
-  }
 }
 
-function addStar(email) {
-  emailStore.starScroll?.addItem(email)
+onMounted(() => {
+    latest()
+})
+
+onUnmounted(() => {
+    alive = false
+})
+
+/* ------------------------------------------------------------ 写信入口 */
+
+/**
+ * 回复 / 转发仍走旧编辑器（`layout/write`，`uiStore.writerRef`）。
+ * `MailComposer` 是 P3 的剩余项 —— 见本次提交说明里的「未完成项」。
+ * 这里用可选调用而不是断言：`/mail/inbox` 在写信面板挂载前也可能先渲染出来。
+ */
+function reply(email) {
+    uiStore.writerRef?.openReply?.(email)
 }
 
-function cancelStar(email) {
-  emailStore.starScroll?.deleteEmail([email.emailId])
+function forward(email) {
+    uiStore.writerRef?.openForward?.(email)
 }
-
-function getEmailList(emailId, size) {
-  const accountId =  accountStore.currentAccountId;
-  const allReceive = accountStore.currentAccount.allReceive;
-  return emailList(accountId, allReceive, emailId, params.timeSort, size, 0).then(data => {
-    data.latestEmail.reqAccountId = accountId;
-    data.latestEmail.allReceive = allReceive;
-    return data;
-  })
-}
-
 </script>
-<style>
-.icon {
-  cursor: pointer;
-}
-</style>
+
+<template>
+  <MailWorkspace
+    ref="workspace"
+    :fetch="fetchList"
+    :star-add="starAdd"
+    :star-cancel="starCancel"
+    :on-delete="emailDelete"
+    :empty-title="t('mail.emptyInbox')"
+    :empty-description="t('mail.emptyInboxHint')"
+    @reply="reply"
+    @forward="forward"
+  />
+</template>

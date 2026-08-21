@@ -30,8 +30,25 @@ const dbInit = {
 		await this.v2_9DB(c);
 		await this.v2_10DB(c);
 		await this.v3_0DB(c);
+		await this.v3_1DB(c);
 		await settingService.refresh(c);
 		return c.text('success');
+	},
+
+	/**
+	 * P3（§10.5 增量 2）：回收站 30 天自动清理需要一个「什么时候被删的」时间。
+	 *
+	 * 只加列、可空、无默认值，所以不重写既有行；`emailService.clearTrash()` 会在第一次
+	 * cron 时给存量的回收站邮件补上时间戳。这一列**不进 drizzle 的 email 实体** ——
+	 * 实体是被 `select({...email})` 到处展开的，加进去等于所有列表接口都要求这一列存在，
+	 * 没跑过 init 的库会当场 500。清理逻辑用裸 SQL 读它，读不到就跳过。
+	 */
+	async v3_1DB(c) {
+		try {
+			await c.env.db.prepare(`ALTER TABLE email ADD COLUMN del_time TEXT;`).run();
+		} catch (e) {
+			console.warn(`跳过字段：${e.message}`);
+		}
 	},
 
 	async v3_0DB(c) {

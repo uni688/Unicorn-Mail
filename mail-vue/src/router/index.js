@@ -26,7 +26,11 @@ const routes = [
             {
                 // §5.2：邮件区收进 `/mail/*`，路由名一个都没改 —— perm.js、命令面板、
                 // 快捷键、旧页面里的 `push({name})` 全靠名字，改 path 不改 name 是零风险的
-                path: '/mail/inbox',
+                //
+                // P3 起尾部多了一个可选的 `:emailId`（§5.2 的 `/mail/:folder/:emailId` 深链）。
+                // 写成可选段而不是子路由：阅读窗格和列表是同一个视图的两栏，拆成父子路由
+                // 会让列表在打开邮件时重新挂载，虚拟滚动的位置就丢了。
+                path: '/mail/inbox/:emailId?',
                 name: 'email',
                 component: () => import('@/views/email/index.vue'),
                 meta: {
@@ -64,12 +68,25 @@ const routes = [
                 }
             },
             {
-                path: '/mail/starred',
+                path: '/mail/starred/:emailId?',
                 name: 'star',
                 component: () => import('@/views/star/index.vue'),
                 meta: {
                     title: 'starred',
                     name: 'star',
+                    menu: true,
+                    mail: true
+                }
+            },
+            {
+                // 回收站（§10.5 增量 2）。P2 时它还不存在，所以侧栏当时不占位；
+                // 现在后端有 `GET /email/trash` 了，这一行才敢出现在 FolderTree 里。
+                path: '/mail/trash/:emailId?',
+                name: 'trash',
+                component: () => import('@/views/trash/index.vue'),
+                meta: {
+                    title: 'mail.trash',
+                    name: 'trash',
                     menu: true,
                     mail: true
                 }

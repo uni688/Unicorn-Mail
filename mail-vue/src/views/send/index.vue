@@ -1,90 +1,63 @@
-<template>
-  <emailScroll ref="sendScroll"
-               :cancel-success="cancelStar"
-               :star-success="addStar"
-               :getEmailList="getEmailList"
-               :emailDelete="emailDelete"
-               :star-add="starAdd"
-               show-status
-               actionLeft="4px"
-               :star-cancel="starCancel"
-               @jump="jumpContent"
-               :time-sort="params.timeSort"
-               :type="'send'"
-  >
-    <template #first>
-      <Icon class="icon" @click="changeTimeSort" icon="material-symbols-light:timer-arrow-down-outline"
-            v-if="params.timeSort === 0" width="28" height="28"/>
-      <Icon class="icon" @click="changeTimeSort" icon="material-symbols-light:timer-arrow-up-outline" v-else
-            width="28" height="28"/>
-    </template>
-  </emailScroll>
-</template>
-
 <script setup>
-import {useAccountStore} from "@/store/account.js";
-import {useEmailStore} from "@/store/email.js";
-import emailScroll from "@/components/email-scroll/index.vue"
-import {emailList, emailDelete} from "@/request/email.js";
-import {starAdd, starCancel} from "@/request/star.js";
-import {defineOptions, onMounted, reactive, ref, watch} from "vue";
-import router from "@/router/index.js";
-import {Icon} from "@iconify/vue";
+/**
+ * 已发送（§7.4）
+ *
+ * 和收件箱同一套壳，四点差别：
+ *   `type=1`      `/email/list` 的发信侧
+ *   `showStatus`  多一列发信状态点（已投递 / 退信 / 被投诉 / 延迟），`useMailList`
+ *                 的 `decorate()` 已经把 `statusIcon` 算好了
+ *   `showUnread`  发出去的邮件没有已读未读
+ *   没有长轮询    新邮件只会出现在收件箱
+ */
+import {ref} from 'vue'
+import {useI18n} from 'vue-i18n'
+import {MailWorkspace} from '@/components/domain'
+import {emailDelete, emailList} from '@/request/email.js'
+import {starAdd, starCancel} from '@/request/star.js'
+import {useAccountStore} from '@/store/account.js'
+import {useEmailStore} from '@/store/email.js'
+import {useUiStore} from '@/store/ui.js'
+import {useMailPrefs} from '@/composables/useMailPrefs.js'
 
-defineOptions({
-  name: 'send'
-})
+defineOptions({name: 'send'})
 
-const emailStore = useEmailStore();
-const accountStore = useAccountStore();
-const sendScroll = ref({})
-const params = reactive({
-  timeSort: 0,
-})
+const {t} = useI18n()
+const accountStore = useAccountStore()
+const emailStore = useEmailStore()
+const uiStore = useUiStore()
+const {prefs} = useMailPrefs()
 
-onMounted(() => {
-  emailStore.sendScroll = sendScroll;
-})
+const workspace = ref(null)
 
-watch(() => accountStore.currentAccountId, () => {
-  sendScroll.value.refreshList();
-})
-
-function changeTimeSort() {
-  params.timeSort = params.timeSort ? 0 : 1
-  sendScroll.value.refreshList();
+function fetchList(cursor, size) {
+    const accountId = accountStore.currentAccountId
+    const allReceive = accountStore.currentAccount?.allReceive
+    return emailList(accountId, allReceive, cursor, prefs.timeSort, size, 1)
 }
 
-function jumpContent(email) {
-  emailStore.contentData.email = email
-  emailStore.contentData.delType = 'logic'
-  emailStore.contentData.showStar = true
-  emailStore.contentData.showReply = true
-  router.push({name: 'content'})
+function onStarCancel(email) {
+    emailStore.cancelStarEmailId = email.emailId
 }
 
-function addStar(email) {
-  emailStore.starScroll?.addItem(email)
+function onStarAdd(email) {
+    emailStore.addStarEmailId = email.emailId
 }
-
-function cancelStar(email) {
-  emailStore.starScroll?.deleteEmail([email.emailId])
-}
-
-function getEmailList(emailId, size) {
-  const accountId =  accountStore.currentAccountId;
-  const allReceive = accountStore.currentAccount.allReceive;
-  return emailList(accountId, allReceive, emailId, params.timeSort, size, 1).then(data => {
-    data.latestEmail.reqAccountId = accountId;
-    data.latestEmail.allReceive = allReceive;
-    return data;
-  })
-}
-
 </script>
 
-<style scoped>
-.icon {
-  cursor: pointer;
-}
-</style>
+<template>
+  <MailWorkspace
+    ref="workspace"
+    :fetch="fetchList"
+    :star-add="starAdd"
+    :star-cancel="starCancel"
+    :on-star-add="onStarAdd"
+    :on-star-cancel="onStarCancel"
+    :on-delete="emailDelete"
+    show-status
+    :show-unread="false"
+    :empty-title="t('mail.emptySent')"
+    :empty-description="t('mail.emptySentHint')"
+    @reply="uiStore.writerRef?.openReply?.($event)"
+    @forward="uiStore.writerRef?.openForward?.($event)"
+  />
+</template>

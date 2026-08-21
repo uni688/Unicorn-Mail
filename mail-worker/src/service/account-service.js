@@ -264,6 +264,81 @@ const accountService = {
 		let mainSort = mainAccountRow.sort === 0 ? 2 : mainAccountRow.sort + 1;
 		await orm(c).update(account).set({ sort: mainSort }).where(eq(account.email, userRow.email )).run();
 		await orm(c).update(account).set({ sort: mainSort - 1 }).where(and(eq(account.accountId, accountId),eq(account.userId,userId))).run();
+	},
+
+	/**
+	 * P3 增量 6（§10.5）：`MailboxPicker` 的服务端搜索。
+	 *
+	 * `list()` 是纯游标分页、没有 keyword，200 个邮箱时前端拿不全也就搜不到，所以新增这一个；
+	 * `list()` 本身一个字没改。
+	 *
+	 * 三件必须做对的事：
+	 * 1. **参数化**。`like` 的模式串走绑定参数（附录 C 第 1 条就是拼 SQL 拼出来的洞）。
+	 * 2. **转义通配符**。用户输进 `%` 或 `_` 时它们是字面量，不是「匹配全部」，
+	 *    所以转义后显式声明 `ESCAPE '\'`。
+	 * 3. **强制归属**。`userId` + `isDel` 是硬条件，不接受外部覆盖。
+	 *
+	 * 前缀命中排在包含命中前面（打 `ab` 先出 `ab@…` 再出 `xab@…`），两条查询一个 batch。
+	 * 返回整行而不是子集：Picker 会把这里的结果和 `list()` 的分页结果拼在同一个列表里，
+	 * 形状一致才不会出现「搜出来的项少字段」的怪 bug。
+	 */
+	async searchByKeyword(c, params, userId) {
+
+		let { keyword, size } = params;
+
+		size = Number(size);
+
+		if (!size || Number.isNaN(size) || size > 20) {
+			size = 20;
+		}
+
+		keyword = (keyword ?? '').trim();
+
+		if (!keyword) {
+			return [];
+		}
+
+		if (keyword.length > 64) {
+			keyword = keyword.substring(0, 64);
+		}
+
+		const safe = keyword.replace(/[\\%_]/g, ch => `\\${ch}`);
+
+		const query = (...conditions) => orm(c).select().from(account)
+			.where(
+				and(
+					eq(account.userId, userId),
+					eq(account.isDel, isDel.NORMAL),
+					...conditions
+				))
+			.orderBy(desc(account.sort), asc(account.accountId))
+			.limit(size);
+
+		const [prefixRows, containsRows] = await orm(c).batch([
+			query(sql`${account.email} COLLATE NOCASE LIKE ${safe + '%'} ESCAPE '\\'`),
+			query(
+				or(
+					sql`${account.email} COLLATE NOCASE LIKE ${'%' + safe + '%'} ESCAPE '\\'`,
+					sql`${account.name} COLLATE NOCASE LIKE ${'%' + safe + '%'} ESCAPE '\\'`
+				)
+			)
+		]);
+
+		const seen = new Set();
+		const list = [];
+
+		for (const row of [...prefixRows, ...containsRows]) {
+			if (seen.has(row.accountId)) {
+				continue;
+			}
+			seen.add(row.accountId);
+			list.push(row);
+			if (list.length >= size) {
+				break;
+			}
+		}
+
+		return list;
 	}
 };
 

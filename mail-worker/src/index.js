@@ -30,5 +30,8 @@ export default {
 		await emailService.completeReceiveAll({ env })
 		await oauthService.clearNoBindOathUser({ env })
 		await analysisService.refreshEchartsCache({ env })
+		// P3 增量 2（决策 9）：回收站满 30 天的邮件物理删除。放在最后，且方法内部自带
+		// try/catch —— 清不了回收站不该影响上面几个日常任务
+		await emailService.clearTrash({ env })
 	},
 };

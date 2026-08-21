@@ -447,6 +447,72 @@ const zh = {
         notFoundDesc: '链接可能已经失效，或者地址输错了。',
         backToInbox: '回到收件箱'
     },
+    /* 邮件列表 / 阅读窗格 / 邮箱选择器（§7.4 §7.6 §10.5）。旧视图已有的文案
+       （noMoreData / emailCount / delete 等）继续用顶层键，这里只放新增的。 */
+    mail: {
+        /* 日期分组头是虚拟列表里的一种行，不是 sticky（§7.4） */
+        today: '今天',
+        yesterday: '昨天',
+        /* 回收站是 P3 增量 2 才有的分类，顶层没有现成的键 */
+        trash: '回收站',
+        /* 侧栏角标的读屏文案：收件箱说「未读」，其余说「封」 */
+        unreadCount: '{n} 封未读',
+        itemCount: '{n} 封',
+        /* MailboxPicker（§7.2）。「全部邮箱」= accountId 0，后端按 allReceive 聚合 */
+        allMailboxes: '全部邮箱',
+        allMailboxesLabel: '全部',
+        recentMailboxes: '最近',
+        searchMailbox: '搜索邮箱',
+        noMailbox: '还没有邮箱',
+        noMailboxMatch: '没有匹配的邮箱',
+        mailboxLoadFailed: '邮箱列表加载失败',
+        /* MailList / MailRow（§7.4）。列表相关的旧键（noMoreData / emailCount）继续用顶层键 */
+        listLabel: '邮件列表',
+        selectAll: '全选本页',
+        selectOne: '选择这封邮件',
+        star: '加星标',
+        unstar: '取消星标',
+        refresh: '刷新',
+        newestFirst: '新邮件在上',
+        oldestFirst: '旧邮件在上',
+        moveToTrash: '移到回收站',
+        restore: '还原',
+        purge: '彻底删除',
+        markRead: '标记为已读',
+        markUnread: '标记为未读',
+        selectedCount: '已选 {n} 封',
+        emptyInbox: '这里还没有邮件',
+        emptyInboxHint: '新邮件会自动出现，不用手动刷新',
+        emptyTrash: '回收站是空的',
+        loadFailed: '邮件列表没能加载出来',
+        loadFailedHint: '可能是网络断了。重试一次通常就好。',
+        errorDetail: '技术细节',
+        reply: '回复',
+        forward: '转发',
+        noSubject: '（无主题）',
+        noSelection: '选一封邮件看看',
+        noSelectionHint: '左边点一封，正文会显示在这里',
+        imagesBlocked: '已屏蔽 {n} 张远程图片',
+        showImagesOnce: '这封显示',
+        showImagesAlways: '以后都显示',
+        back: '返回',
+        download: '下载',
+        emptyTrashHint: '删掉的邮件会先放在这里',
+        trashRetention: '回收站里的邮件保留 30 天',
+        emptyTrashAction: '清空回收站',
+        emptyTrashConfirmTitle: '清空回收站？',
+        emptyTrashConfirmHint: '回收站里的邮件会被彻底删除，无法恢复。',
+        purgeAll: '彻底清空',
+        emptyStar: '还没有星标邮件',
+        emptyStarHint: '在列表里点邮件左边的星星就会出现在这里',
+        emptySent: '还没有发过邮件',
+        emptySentHint: '发出去的邮件会留在这里',
+        density: {
+            compact: '紧凑',
+            cozy: '标准',
+            roomy: '宽松',
+        },
+    },
     /* 登录 / 注册 / 绑定 / OAuth 回调（§5.3）。旧登录页已有的文案继续用顶层键，
        这里只补新增的四个视图需要、旧页面没有的部分。 */
     auth: {

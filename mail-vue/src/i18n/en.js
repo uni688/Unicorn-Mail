@@ -443,6 +443,72 @@ const en = {
         notFoundDesc: 'The link may have expired, or the address was mistyped.',
         backToInbox: 'Back to inbox'
     },
+    /* Mail list / reader / mailbox picker (§7.4 §7.6 §10.5). Copy that the legacy views
+       already have (noMoreData / emailCount / delete …) stays on the top-level keys. */
+    mail: {
+        /* Date group headers are rows inside the virtual list, not sticky headers (§7.4) */
+        today: 'Today',
+        yesterday: 'Yesterday',
+        /* Trash only exists from P3 increment 2 on, so there is no legacy top-level key */
+        trash: 'Trash',
+        /* Screen-reader text for sidebar counts: inbox says "unread", the rest say "messages" */
+        unreadCount: '{n} unread',
+        itemCount: '{n} messages',
+        /* MailboxPicker (§7.2). "All mailboxes" = accountId 0, aggregated by allReceive */
+        allMailboxes: 'All mailboxes',
+        allMailboxesLabel: 'All',
+        recentMailboxes: 'Recent',
+        searchMailbox: 'Search mailboxes',
+        noMailbox: 'No mailboxes yet',
+        noMailboxMatch: 'No matching mailbox',
+        mailboxLoadFailed: 'Could not load mailboxes',
+        /* MailList / MailRow (§7.4). Legacy list keys (noMoreData / emailCount) stay top-level */
+        listLabel: 'Message list',
+        selectAll: 'Select all loaded',
+        selectOne: 'Select this message',
+        star: 'Star',
+        unstar: 'Remove star',
+        refresh: 'Refresh',
+        newestFirst: 'Newest first',
+        oldestFirst: 'Oldest first',
+        moveToTrash: 'Move to trash',
+        restore: 'Restore',
+        purge: 'Delete forever',
+        markRead: 'Mark as read',
+        markUnread: 'Mark as unread',
+        selectedCount: '{n} selected',
+        emptyInbox: 'No messages here yet',
+        emptyInboxHint: 'New mail shows up on its own — no need to refresh.',
+        emptyTrash: 'Trash is empty',
+        loadFailed: 'Could not load the message list',
+        loadFailedHint: 'Probably a network hiccup. Retrying usually fixes it.',
+        errorDetail: 'Technical details',
+        reply: 'Reply',
+        forward: 'Forward',
+        noSubject: '(no subject)',
+        noSelection: 'Pick a message',
+        noSelectionHint: 'Choose one on the left and it opens here',
+        imagesBlocked: '{n} remote images blocked',
+        showImagesOnce: 'Show once',
+        showImagesAlways: 'Always show',
+        back: 'Back',
+        download: 'Download',
+        emptyTrashHint: 'Deleted messages land here first',
+        trashRetention: 'Messages in trash are kept for 30 days',
+        emptyTrashAction: 'Empty trash',
+        emptyTrashConfirmTitle: 'Empty the trash?',
+        emptyTrashConfirmHint: 'Everything in the trash will be deleted permanently.',
+        purgeAll: 'Delete everything',
+        emptyStar: 'No starred messages yet',
+        emptyStarHint: 'Star a message in the list and it shows up here',
+        emptySent: 'Nothing sent yet',
+        emptySentHint: 'Messages you send stay here',
+        density: {
+            compact: 'Compact',
+            cozy: 'Default',
+            roomy: 'Roomy',
+        },
+    },
     /* Sign in / sign up / bind / OAuth callback (§5.3). Copy that already exists on the
        legacy login view keeps its top-level keys; only the new bits live here. */
     auth: {

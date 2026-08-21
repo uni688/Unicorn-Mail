@@ -24,7 +24,7 @@
  * 「转到」与「设置」两组都用 `router.hasRoute()` 判定而不是 `hasPerm()`：管理页是
  * `permsToRouter()` 动态注入的，路由在不在比权限键在不在更接近「点了会不会 404」。
  */
-import {computed, ref, shallowRef, watch} from 'vue'
+import {computed, ref, watch} from 'vue'
 import {useRouter} from 'vue-router'
 import {useI18n} from 'vue-i18n'
 import IconSquarePen from '~icons/lucide/square-pen'
@@ -54,10 +54,10 @@ import {useUserStore} from '@/store/user.js'
 import {useAccountStore} from '@/store/account.js'
 import {useSettingStore} from '@/store/setting.js'
 import {toast} from '@/components/ui/Toast/toast.js'
-import {accountList} from '@/request/account.js'
 import {logout} from '@/request/login.js'
 import {setExtend} from '@/utils/day.js'
 import {openShortcuts} from '@/composables/useShortcutsDialog.js'
+import {useMailboxes} from '@/composables/useMailboxes.js'
 
 /* -------------------------------------------------------------- 单例状态 */
 
@@ -221,25 +221,18 @@ export function useCommandPalette() {
     const {adminPolicy, userPref: bgPref, setUserPref: setBgPref} = useBgEffect()
     const {mode, term} = usePaletteState()
 
-    /** `@` 模式的数据：首次进入该模式才拉一页（§6.2 的 `useMailboxes()` 也是这个策略） */
-    const mailboxes = shallowRef([])
-    const mailboxLoading = ref(false)
-    let mailboxLoaded = false
+    /**
+     * `@` 模式的数据源。P3 起换成 `useMailboxes()`（§10.5 增量 6）：与侧栏 Picker 共用
+     * 同一份分页缓存与**服务端搜索**，所以 200 个邮箱时面板也能搜到第 137 个 ——
+     * 之前这里是「首页 30 条 + 客户端过滤」，搜不到的就只能点「更多邮箱」去旧浮层。
+     */
+    const {
+        mailboxes: mailboxPage, results: mailboxResults, loading: mailboxPageLoading,
+        searching: mailboxSearching, ensureFirstPage: ensureMailboxes, search: searchMailboxes,
+        select: selectMailbox,
+    } = useMailboxes()
 
-    async function ensureMailboxes() {
-        if (mailboxLoaded || mailboxLoading.value) return
-        mailboxLoading.value = true
-        try {
-            const list = await accountList(0, 30)
-            mailboxes.value = Array.isArray(list) ? list : (list?.list ?? [])
-            mailboxLoaded = true
-        } catch {
-            // 行内静默：面板里给「打开邮箱面板」兜底，不该为此弹 Toast
-            mailboxes.value = []
-        } finally {
-            mailboxLoading.value = false
-        }
-    }
+    const mailboxLoading = computed(() => mailboxPageLoading.value || mailboxSearching.value)
 
     /** 只有真的注册了的路由才进列表：管理页是动态注入的，权限键在不代表路由在 */
     function go(name) {
@@ -306,7 +299,9 @@ export function useCommandPalette() {
             out.push({
                 value: 'act:mailboxes', label: t('shell.switchMailbox'), icon: IconAtSign,
                 keywords: 'mailbox switch account qiehuanyouxiang', shortcut: 'Mod+Shift+E',
-                run: () => { uiStore.accountShow = true },
+                // P3 起邮箱切换在命令面板自己的 `@` 模式里（下面 mailboxes 那一组），
+                // 不再弹旧的账号浮层
+                run: () => openPalette('@'),
             })
         }
         out.push(
@@ -358,25 +353,19 @@ export function useCommandPalette() {
      * 面板其余部分不用动。
      */
     const mailboxItems = computed(() => {
-        const rows = mailboxes.value.map((account) => ({
+        const source = term.value.trim() ? mailboxResults : mailboxPage
+        const rows = source.map((account) => ({
             value: `mbx:${account.accountId}`,
             label: account.email,
             hint: account.accountId === accountStore.currentAccountId ? t('shell.current') : undefined,
             keywords: account.name,
             icon: IconAtSign,
             run: () => {
-                accountStore.currentAccountId = account.accountId
-                accountStore.currentAccount = account
+                // 副作用与侧栏 Picker 完全一致（同一个 `select()`），两个入口不会选出不同状态
+                selectMailbox(account)
                 go('email')
             },
         }))
-        if (settingStore.settings.manyEmail === 0) {
-            rows.push({
-                value: 'mbx:more', label: t('shell.moreMailboxes'), icon: IconMails,
-                keywords: 'more all mailboxes gengduo',
-                run: () => { uiStore.accountShow = true },
-            })
-        }
         return rows
     })
 
@@ -393,6 +382,12 @@ export function useCommandPalette() {
     watch([open, mode], ([isOpen, m]) => {
         if (isOpen && m === 'mailbox') ensureMailboxes()
     }, {immediate: true})
+
+    // `@` 模式下的输入走服务端搜索（`useMailboxes` 自己做 120ms 防抖 + 取消旧请求）
+    watch([open, mode, term], ([isOpen, m, q]) => {
+        if (!isOpen || m !== 'mailbox') return
+        searchMailboxes(q)
+    })
 
     /**
      * 分组顺序：最近（仅空输入）→ 动作 → 转到 → 设置 → 邮箱。
@@ -426,7 +421,7 @@ export function useCommandPalette() {
         push(t('shell.groupGoto'), gotoItems.value)
         push(t('shell.groupSettings'), settingsItems.value)
         // `all` 模式下只用**已经拉到的**邮箱，避免为了一次搜索去打接口
-        if (q && mailboxes.value.length) push(t('shell.groupMailboxes'), mailboxItems.value, 6)
+        if (q && mailboxItems.value.length) push(t('shell.groupMailboxes'), mailboxItems.value, 6)
         return out
     })
 

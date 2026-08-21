@@ -110,7 +110,8 @@ async function copyEmail() {
 }
 
 function openMailboxes() {
-    uiStore.accountShow = true
+    // P3 起不再弹旧账号浮层：命令面板的 `@` 模式与侧栏 Picker 共用 `useMailboxes()`
+    openPalette('@')
 }
 
 async function doLogout() {

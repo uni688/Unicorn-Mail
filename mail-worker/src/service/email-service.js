@@ -986,6 +986,291 @@ const emailService = {
 	async read(c, params, userId) {
 		const { emailIds } = params;
 		await orm(c).update(email).set({ unread: emailConst.unread.READ }).where(and(eq(email.userId, userId), inArray(email.emailId, emailIds)));
+	},
+
+	/* ------------------------------------------------------------------ P3 增量（§10.5）
+	 * 以下方法全部是新增，上面的既有函数一个都没动。
+	 */
+
+	/**
+	 * 增量 1：侧栏与 Picker 的角标计数。三种模式互斥：
+	 *
+	 * - `accountIds=1,2,3`（最多 5 个）→ `{unreadMap}`，给 Picker「最近」分组的未读角标。
+	 *   一条 groupBy 查完，不是 N 次查询。
+	 * - `all=1` → 「全部邮箱」聚合。
+	 * - `accountId=N` → 单个邮箱。该邮箱若开了「接收全部」，计数跟着 `list()` 一起放宽，
+	 *   否则数字会比列表条数小。
+	 *
+	 * 谓词逐条对齐 `list()`（含 `leftJoin(account)` + `account.isDel`）：§10.5 要求
+	 * 「计数必须和列表一致」，所以这里既不加 KV 缓存也不加 status 过滤。
+	 * `star` 故意不按邮箱过滤 —— `starService.list()` 是按用户查的，过滤了就对不上。
+	 * 草稿不在这里：草稿只存在浏览器 Dexie 里，后端根本没有这张表。
+	 */
+	async counts(c, params, userId) {
+
+		let { accountId, all, accountIds } = params;
+
+		if (accountIds) {
+
+			const ids = String(accountIds)
+				.split(',')
+				.map(Number)
+				.filter(id => Number.isInteger(id) && id > 0)
+				.slice(0, 5);
+
+			const unreadMap = {};
+
+			if (ids.length === 0) {
+				return { unreadMap };
+			}
+
+			ids.forEach(id => unreadMap[id] = 0);
+
+			const rows = await orm(c).select({ accountId: email.accountId, num: count() })
+				.from(email)
+				.where(
+					and(
+						eq(email.userId, userId),
+						inArray(email.accountId, ids),
+						eq(email.type, emailConst.type.RECEIVE),
+						eq(email.unread, emailConst.unread.UNREAD),
+						eq(email.isDel, isDel.NORMAL)
+					))
+				.groupBy(email.accountId)
+				.all();
+
+			rows.forEach(row => unreadMap[row.accountId] = row.num);
+			return { unreadMap };
+		}
+
+		all = Number(all);
+		accountId = Number(accountId);
+
+		let allReceive = all === 1;
+
+		if (!allReceive) {
+
+			const accountRow = await accountService.selectById(c, accountId);
+
+			// 越权保护：selectById 不带 userId，必须自己核对归属
+			if (!accountRow || accountRow.userId !== userId) {
+				throw new BizError(t('noUserAccount'));
+			}
+
+			allReceive = !!accountRow.allReceive;
+		}
+
+		const scope = (...extra) => and(
+			eq(email.userId, userId),
+			allReceive ? eq(1, 1) : eq(email.accountId, accountId),
+			eq(account.isDel, isDel.NORMAL),
+			...extra
+		);
+
+		const countQuery = () => orm(c).select({ num: count() })
+			.from(email)
+			.leftJoin(account, eq(account.accountId, email.accountId));
+
+		// 一次 batch = 一个 D1 往返；6 条 COUNT 分开发就是 6 个往返
+		const [inbox, unread, code, trash, sent, starred] = await orm(c).batch([
+			countQuery().where(scope(eq(email.type, emailConst.type.RECEIVE), eq(email.isDel, isDel.NORMAL))),
+			countQuery().where(scope(eq(email.type, emailConst.type.RECEIVE), eq(email.isDel, isDel.NORMAL), eq(email.unread, emailConst.unread.UNREAD))),
+			countQuery().where(scope(eq(email.type, emailConst.type.RECEIVE), eq(email.isDel, isDel.NORMAL), ne(email.code, ''))),
+			countQuery().where(scope(eq(email.isDel, isDel.DELETE))),
+			countQuery().where(scope(eq(email.type, emailConst.type.SEND), eq(email.isDel, isDel.NORMAL))),
+			orm(c).select({ num: count() })
+				.from(star)
+				.leftJoin(email, eq(email.emailId, star.emailId))
+				.where(and(eq(star.userId, userId), eq(email.isDel, isDel.NORMAL)))
+		]);
+
+		const num = rows => rows[0]?.num ?? 0;
+
+		return {
+			inbox: num(inbox),
+			unread: num(unread),
+			star: num(starred),
+			code: num(code),
+			trash: num(trash),
+			sent: num(sent)
+		};
+	},
+
+	/**
+	 * 增量 2：回收站列表。删除本来就是软删（`delete()` 只写 `isDel`），所以这里就是
+	 * 把 `list()` 的分页原样抄一遍、把 `isDel` 反过来。
+	 *
+	 * 不去改 `list()` 加分支，也没有做成 `/email/list?type=trash` —— `type` 在 `list()`
+	 * 里是数字（收/发），塞一个字符串进去会和既有语义打架，所以回收站是独立路由。
+	 * 默认不按 type 过滤：删掉的已发送邮件同样该出现在回收站里。
+	 */
+	async trashList(c, params, userId) {
+
+		let { emailId, accountId, size, type, allReceive } = params;
+
+		size = Number(size);
+		emailId = Number(emailId);
+		accountId = Number(accountId);
+		allReceive = Number(allReceive);
+		type = type === undefined || type === '' ? undefined : Number(type);
+
+		if (size > 50 || !size || Number.isNaN(size)) {
+			size = 50;
+		}
+
+		if (!emailId) {
+			emailId = 9999999999;
+		}
+
+		if (Number.isNaN(allReceive)) {
+			const accountRow = await accountService.selectById(c, accountId);
+			allReceive = accountRow ? accountRow.allReceive : 0;
+		}
+
+		const scope = (...extra) => and(
+			allReceive ? eq(1, 1) : eq(email.accountId, accountId),
+			eq(email.userId, userId),
+			eq(email.isDel, isDel.DELETE),
+			eq(account.isDel, isDel.NORMAL),
+			Number.isInteger(type) ? eq(email.type, type) : undefined,
+			...extra
+		);
+
+		const listQuery = orm(c)
+			.select({ ...email, starId: star.starId })
+			.from(email)
+			.leftJoin(star, and(eq(star.emailId, email.emailId), eq(star.userId, userId)))
+			.leftJoin(account, eq(account.accountId, email.accountId))
+			.where(scope(lt(email.emailId, emailId)))
+			.orderBy(desc(email.emailId))
+			.limit(size)
+			.all();
+
+		const totalQuery = orm(c).select({ total: count() })
+			.from(email)
+			.leftJoin(account, eq(account.accountId, email.accountId))
+			.where(scope())
+			.get();
+
+		let [list, totalRow] = await Promise.all([listQuery, totalQuery]);
+
+		list = list.map(item => ({ ...item, isStar: item.starId != null ? 1 : 0 }));
+
+		await this.emailAddAtt(c, list);
+
+		return { list, total: totalRow.total };
+	},
+
+	/** 增量 2：从回收站还原。删除是软删，还原就是把 `isDel` 写回去 */
+	async restore(c, params, userId) {
+
+		const emailIds = this.toEmailIds(params.emailIds);
+
+		if (emailIds.length === 0) {
+			return;
+		}
+
+		await orm(c).update(email).set({ isDel: isDel.NORMAL }).where(
+			and(
+				eq(email.userId, userId),
+				eq(email.isDel, isDel.DELETE),
+				inArray(email.emailId, emailIds)))
+			.run();
+	},
+
+	/**
+	 * 增量 2：彻底删除。这是用户侧唯一的物理删除入口，误传 id 就是真丢数据，
+	 * 所以先按 `userId + isDel=DELETE` 把 id 捞回来，只删捞到的那些；
+	 * `emailIds` 不传 = 清空回收站。
+	 */
+	async purge(c, params, userId) {
+
+		const emailIds = this.toEmailIds(params.emailIds);
+
+		const rows = await orm(c).select({ emailId: email.emailId }).from(email).where(
+			and(
+				eq(email.userId, userId),
+				eq(email.isDel, isDel.DELETE),
+				emailIds.length > 0 ? inArray(email.emailId, emailIds) : undefined))
+			.all();
+
+		await this.physicsDeleteEmailIds(c, rows.map(row => row.emailId));
+	},
+
+	/** 增量 3：标记未读。既有的 `read()` 是单向的，这里补反向的一半 */
+	async markUnread(c, params, userId) {
+
+		const emailIds = this.toEmailIds(params.emailIds);
+
+		if (emailIds.length === 0) {
+			return;
+		}
+
+		await orm(c).update(email).set({ unread: emailConst.unread.UNREAD }).where(
+			and(
+				eq(email.userId, userId),
+				inArray(email.emailId, emailIds)))
+			.run();
+	},
+
+	toEmailIds(emailIds) {
+		if (emailIds === undefined || emailIds === null || emailIds === '') {
+			return [];
+		}
+		const list = Array.isArray(emailIds) ? emailIds : String(emailIds).split(',');
+		return list.map(Number).filter(id => Number.isInteger(id) && id > 0);
+	},
+
+	/** 分批物理删除：`removeByEmailIds` 每个 id 会展开 2 条 SQL，一次别喂太多进 batch */
+	async physicsDeleteEmailIds(c, emailIds) {
+
+		if (!emailIds || emailIds.length === 0) {
+			return 0;
+		}
+
+		const CHUNK = 100;
+
+		for (let i = 0; i < emailIds.length; i += CHUNK) {
+			const chunk = emailIds.slice(i, i + CHUNK);
+			await attService.removeByEmailIds(c, chunk);
+			await starService.removeByEmailIds(c, chunk);
+			await orm(c).delete(email).where(inArray(email.emailId, chunk)).run();
+		}
+
+		return emailIds.length;
+	},
+
+	/**
+	 * 增量 2 的 cron 部分（决策 9「回收站 30 天清理」）：由 `scheduled()` 每天调用一次。
+	 *
+	 * 计时用的是新增列 `email.del_time`，**不是** `create_time` —— 拿收件时间算，
+	 * 一封两年前的邮件今天删掉今晚就被真删了。
+	 *
+	 * `delete()` 一个字没改，代价是新进回收站的邮件要等下一次 cron 才被盖上时间戳：
+	 * 这里先给所有 `del_time IS NULL` 的补时间戳，再删满 30 天的。所以实际保留期是
+	 * 30 天 + 最多一个 cron 间隔（当前一天一次），只会多留、不会早删。
+	 *
+	 * `del_time` 是 `v3_1DB()` 加的列。没跑过 init 的库这里会抛「no such column」，
+	 * 捕获后只打警告：清不了回收站不该拖垮 `scheduled()` 里其它的日常任务。
+	 */
+	async clearTrash(c, days = 30, limit = 500) {
+
+		try {
+
+			await c.env.db.prepare(
+				`UPDATE email SET del_time = CURRENT_TIMESTAMP WHERE is_del = 1 AND del_time IS NULL`
+			).run();
+
+			const { results } = await c.env.db.prepare(
+				`SELECT email_id FROM email WHERE is_del = 1 AND del_time IS NOT NULL AND del_time <= datetime('now', ?) LIMIT ?`
+			).bind(`-${Number(days)} day`, Number(limit)).all();
+
+			return await this.physicsDeleteEmailIds(c, (results ?? []).map(row => row.email_id));
+
+		} catch (e) {
+			console.warn(`回收站清理跳过：${e.message}（缺少 email.del_time 列时请重新执行 /api/init/:secret）`);
+			return 0;
+		}
 	}
 };
 
