@@ -30,6 +30,7 @@ import {defineOptions, ref, watch, toRaw} from "vue";
 import {useUiStore} from "@/store/ui.js";
 import {userDraftStore} from "@/store/draft.js";
 import db from "@/db/db.js"
+import {openCompose} from "@/composables/useComposer.js"
 
 defineOptions({
   name: 'draft'
@@ -84,8 +85,9 @@ async function deleteDraft(draftIds) {
 
 async function jumpContent(email) {
   const att = await db.value.att.get(email.draftId)
-  email.attachments = att.attachments
-  uiStore.writerRef.openDraft(email);
+  email.attachments = att?.attachments ?? []
+  // P3：草稿在写信页里铺开（旧实现是打开那个 fixed 浮层）
+  openCompose('draft', {draft: email})
 }
 
 </script>

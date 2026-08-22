@@ -503,6 +503,11 @@ const en = {
         emptyStarHint: 'Star a message in the list and it shows up here',
         emptySent: 'Nothing sent yet',
         emptySentHint: 'Messages you send stay here',
+        saveDraft: 'Save draft',
+        draftSaved: 'Draft saved',
+        discardDraft: 'Discard without saving',
+        recipientPlaceholder: 'Type an address, Enter or comma to add',
+        addAttachment: 'Add attachment',
         density: {
             compact: 'Compact',
             cozy: 'Default',

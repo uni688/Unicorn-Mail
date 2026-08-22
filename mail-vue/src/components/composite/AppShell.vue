@@ -45,6 +45,7 @@ import {useHotkeys} from '@/composables/useHotkeys.js'
 import {useTheme} from '@/composables/useTheme.js'
 import {openPalette, recordVisit, togglePalette} from '@/composables/useCommandPalette.js'
 import {openShortcuts} from '@/composables/useShortcutsDialog.js'
+import {openCompose} from '@/composables/useComposer.js'
 import {useMailActions} from '@/composables/useMailActions.js'
 import {useUiStore} from '@/store/ui.js'
 import {useSettingStore} from '@/store/setting.js'
@@ -158,8 +159,9 @@ useHotkeys([
     {id: 'go-admin', run: () => go('analysis')},
     {
         id: 'compose',
-        when: () => hasPerm('email:send') && !!uiStore.writerRef,
-        run: () => uiStore.writerRef?.open?.(),
+        // 路由存在 = 有 `email:send`（perm.js 按权限注入），所以不用再查一遍权限键
+        when: () => router.hasRoute('compose'),
+        run: () => openCompose(),
     },
     // 「切换邮箱」与「邮箱管理」都进 `@` 模式：一个入口，一套状态
     {id: 'mailbox-picker', when: () => canSwitchMailbox.value, run: openMailboxes},

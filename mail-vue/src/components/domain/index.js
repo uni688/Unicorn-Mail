@@ -20,3 +20,6 @@ export {default as MailBody} from './MailBody.vue'
 
 /* 列表 + 阅读窗格的双栏工作区（§7.5）：四个邮件视图的共同形状 */
 export {default as MailWorkspace} from './MailWorkspace.vue'
+
+/* 写信（§7.7）：整页，不是弹窗 */
+export {default as MailComposer} from './MailComposer.vue'

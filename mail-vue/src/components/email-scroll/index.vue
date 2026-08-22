@@ -22,8 +22,7 @@
 
       <div class="header-right">
         <span class="email-count" v-if="total">{{ $t('emailCount', {total: total}) }}</span>
-        <Icon v-if="showAccountIcon" class="more-icon icon" width="16" height="16" icon="akar-icons:dot-grid-fill"
-              @click="changeAccountShow"/>
+        <!-- P3：旧账号浮层删了，这个「展开浮层」按钮没有落点，于是不再渲染 -->
       </div>
     </div>
 
@@ -239,6 +238,7 @@ import skeletonBlock from "@/components/email-scroll/skeleton/index.vue"
 import {computed, onActivated, reactive, ref, watch, nextTick, onMounted, onUnmounted } from "vue";
 import {useEmailStore} from "@/store/email.js";
 import {useUiStore} from "@/store/ui.js";
+import {openCompose} from "@/composables/useComposer.js";
 import {useSettingStore} from "@/store/setting.js";
 import {sleep} from "@/utils/time-utils.js"
 import {fromNow} from "@/utils/day.js";
@@ -487,11 +487,11 @@ window.addEventListener('wheel', (event) => {
 })
 
 function openReply(email) {
-  uiStore.writerRef.openReply(email)
+  openCompose('reply', {email})
 }
 
 function openForward(email) {
-  uiStore.writerRef.openForward(email)
+  openCompose('forward', {email})
 }
 
 function visibleChange(e) {
@@ -547,9 +547,12 @@ function getSkeletonRows() {
   skeletonRows = emailList.length
 }
 
-const accountShow = computed(() => {
-  return uiStore.accountShow && settingStore.settings.manyEmail === 0
-})
+/**
+ * P3：旧账号浮层（`layout/account`）与 `uiStore.accountShow` 一起退场了，
+ * 这个组件只剩草稿箱与管理端「全部邮件」在用（P4 一起换掉），所以这里退化成常量 —— 
+ * 它原本只影响标题是否分两列。
+ */
+const accountShow = computed(() => false)
 
 function htmlToText(email) {
   if (email.content) {
@@ -607,10 +610,6 @@ function starChange(email) {
       email.isStar = 1;
     })
   }
-}
-
-function changeAccountShow() {
-  uiStore.accountShow = !uiStore.accountShow;
 }
 
 const handleRead = () => {

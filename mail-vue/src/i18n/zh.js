@@ -507,6 +507,11 @@ const zh = {
         emptyStarHint: '在列表里点邮件左边的星星就会出现在这里',
         emptySent: '还没有发过邮件',
         emptySentHint: '发出去的邮件会留在这里',
+        saveDraft: '存草稿',
+        draftSaved: '草稿已保存',
+        discardDraft: '不保存，直接丢弃',
+        recipientPlaceholder: '输入邮箱地址，回车或逗号分隔',
+        addAttachment: '添加附件',
         density: {
             compact: '紧凑',
             cozy: '标准',

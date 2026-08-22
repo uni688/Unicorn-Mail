@@ -75,6 +75,19 @@ function legacyRedirects(perm) {
 const routers = {
     'email:send': [
         {
+            // 写信页（§7.7）。跟着 `email:send` 注入：没有发信权限的角色连路由都不该存在，
+            // 否则命令面板 / 快捷键会把人送到一个点了就报错的页面。
+            // `menu: false` —— 它不是一个「可停留的位置」，不进导航也不进最近访问。
+            path: '/mail/compose',
+            name: 'compose',
+            component: () => import('@/views/compose/index.vue'),
+            meta: {
+                title: 'send',
+                name: 'compose',
+                menu: false
+            }
+        },
+        {
             path: '/mail/sent',
             name: 'send',
             component: () => import('@/views/send/index.vue'),

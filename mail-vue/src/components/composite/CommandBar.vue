@@ -18,7 +18,7 @@
  * **P2 的两处缺口（已在交付说明里报备）**：
  * 1. 右段（排序 / 密度 / 窗格 / 刷新）不渲染。它们是**视图状态**而不是上下文动作，
  *    状态归属 P3 的 `MailList`；在没有列表的情况下摆四个控件，点了什么都不会发生。
- * 2. 「新邮件」不带 `▾`。P2 只有「写新邮件」一个落点（`uiStore.writerRef.open()`），
+ * 2. 「新邮件」不带 `▾`。落点只有「写新邮件」一个（P3 起是 `/mail/compose` 整页），
  *    模板 / 回信草稿要等 P3；一个只有一项的下拉是纯粹的多余点击。
  *
  * 选择模型是 P3（§7.4），所以 `selectedCount` 恒为 0，四个动作恒 disabled。
@@ -33,7 +33,7 @@ import IconTrash from '~icons/lucide/trash-2'
 import IconCopy from '~icons/lucide/copy'
 import IconEllipsis from '~icons/lucide/ellipsis'
 import {Button, DropdownMenu, MenuItem, Separator, Tooltip} from '@/components/ui'
-import {useUiStore} from '@/store/ui.js'
+import {openCompose} from '@/composables/useComposer.js'
 import {hasPerm} from '@/perm/perm.js'
 import {cn} from '@/utils/cn.js'
 
@@ -46,7 +46,6 @@ const props = defineProps({
 const emit = defineEmits(['mark-read', 'star', 'delete', 'copy-code'])
 
 const {t} = useI18n()
-const uiStore = useUiStore()
 
 const canCompose = computed(() => hasPerm('email:send'))
 const hasSelection = computed(() => props.selectedCount > 0)
@@ -59,8 +58,8 @@ const ACTIONS = [
     {id: 'copy-code', label: 'shell.copyCode', icon: IconCopy, keys: undefined},
 ]
 
-function openCompose() {
-    uiStore.writerRef?.open?.()
+function compose() {
+    openCompose()
 }
 </script>
 
@@ -80,7 +79,7 @@ function openCompose() {
       size="sm"
       aria-keyshortcuts="C"
       :title="t('shell.compose')"
-      @click="openCompose"
+      @click="compose"
     >
       <template #icon><IconSquarePen class="size-4 shrink-0" aria-hidden="true" /></template>
       {{ t('shell.compose') }}

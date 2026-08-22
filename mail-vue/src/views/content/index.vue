@@ -90,6 +90,7 @@ import {getIconByName} from "@/utils/icon-utils.js";
 import {useSettingStore} from "@/store/setting.js";
 import {allEmailDelete} from "@/request/all-email.js";
 import {useUiStore} from "@/store/ui.js";
+import {openCompose} from "@/composables/useComposer.js";
 import {useI18n} from "vue-i18n";
 import {EmailUnreadEnum} from "@/enums/email-enum.js";
 
@@ -119,11 +120,11 @@ onUnmounted(() => {
 })
 
 function openReply() {
-  uiStore.writerRef.openReply(email)
+  openCompose('reply', {email})
 }
 
 function openForward() {
-  uiStore.writerRef.openForward(email)
+  openCompose('forward', {email})
 }
 
 function toMessage(message) {

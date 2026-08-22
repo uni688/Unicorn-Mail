@@ -17,12 +17,12 @@ import {onMounted, onUnmounted, ref} from 'vue'
 import {useI18n} from 'vue-i18n'
 import {useRoute} from 'vue-router'
 import {MailWorkspace} from '@/components/domain'
+import {openCompose} from '@/composables/useComposer.js'
 import {emailDelete, emailLatest, emailList} from '@/request/email.js'
 import {starAdd, starCancel} from '@/request/star.js'
 import {useAccountStore} from '@/store/account.js'
 import {useSettingStore} from '@/store/setting.js'
 import {useMailPrefs} from '@/composables/useMailPrefs.js'
-import {useUiStore} from '@/store/ui.js'
 import {sleep} from '@/utils/time-utils.js'
 
 defineOptions({name: 'email'})
@@ -31,7 +31,6 @@ const {t} = useI18n()
 const route = useRoute()
 const accountStore = useAccountStore()
 const settingStore = useSettingStore()
-const uiStore = useUiStore()
 const {prefs} = useMailPrefs()
 
 const workspace = ref(null)
@@ -103,17 +102,13 @@ onUnmounted(() => {
 
 /* ------------------------------------------------------------ 写信入口 */
 
-/**
- * 回复 / 转发仍走旧编辑器（`layout/write`，`uiStore.writerRef`）。
- * `MailComposer` 是 P3 的剩余项 —— 见本次提交说明里的「未完成项」。
- * 这里用可选调用而不是断言：`/mail/inbox` 在写信面板挂载前也可能先渲染出来。
- */
+/** 回复 / 转发 = 带着这封邮件去写信页（§7.7 整页写信） */
 function reply(email) {
-    uiStore.writerRef?.openReply?.(email)
+    openCompose('reply', {email})
 }
 
 function forward(email) {
-    uiStore.writerRef?.openForward?.(email)
+    openCompose('forward', {email})
 }
 </script>
 

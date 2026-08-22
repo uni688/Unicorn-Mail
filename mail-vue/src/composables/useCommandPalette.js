@@ -49,7 +49,6 @@ import IconServerCog from '~icons/lucide/server-cog'
 import IconUser from '~icons/lucide/user'
 import {useTheme} from '@/composables/useTheme.js'
 import {useBgEffect, USER_BG_MODES} from '@/composables/useBgEffect.js'
-import {useUiStore} from '@/store/ui.js'
 import {useUserStore} from '@/store/user.js'
 import {useAccountStore} from '@/store/account.js'
 import {useSettingStore} from '@/store/setting.js'
@@ -58,6 +57,7 @@ import {logout} from '@/request/login.js'
 import {setExtend} from '@/utils/day.js'
 import {openShortcuts} from '@/composables/useShortcutsDialog.js'
 import {useMailboxes} from '@/composables/useMailboxes.js'
+import {openCompose} from '@/composables/useComposer.js'
 
 /* -------------------------------------------------------------- 单例状态 */
 
@@ -213,7 +213,6 @@ export const SETTINGS = [
 export function useCommandPalette() {
     const router = useRouter()
     const {t, locale} = useI18n()
-    const uiStore = useUiStore()
     const userStore = useUserStore()
     const accountStore = useAccountStore()
     const settingStore = useSettingStore()
@@ -288,11 +287,11 @@ export function useCommandPalette() {
     /** 动作组（§7.2）。「创建 API Key」「刷新收件箱」要等 P4/P3 的页面与命令条，先不列。 */
     const actions = computed(() => {
         const out = []
-        if (uiStore.writerRef) {
+        if (router.hasRoute('compose')) {
             out.push({
                 value: 'act:compose', label: t('shell.compose'), icon: IconSquarePen,
                 keywords: 'compose write new xiexin', shortcut: 'c',
-                run: () => uiStore.writerRef?.open?.(),
+                run: () => openCompose(),
             })
         }
         if (settingStore.settings.manyEmail === 0) {

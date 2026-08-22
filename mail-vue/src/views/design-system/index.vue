@@ -202,7 +202,7 @@ const modeLabel = {light: '浅色', dark: '深色', system: '跟随系统'}
 const COMPONENT_COUNT = 50
 
 /** `composite/` + `domain/` 的个数；同一个测试也守着这两个桶 */
-const COMPOSITE_COUNT = 24
+const COMPOSITE_COUNT = 25
 
 /** 目录锚点，顺序与下面五个 section 文件的渲染顺序一致 */
 const TOC = [

@@ -87,6 +87,8 @@ describe('路由表 · 认证四视图（§5.3.1）', () => {
 
 describe('permsToRouter · 权限页（§5.2「映射关系不变，只改目标 path」）', () => {
     const PAGES = {
+        // 写信页跟着 `email:send` 注入（§7.7 整页写信），`menu: false` —— 不进导航
+        compose: '/mail/compose',
         send: '/mail/sent',
         draft: '/mail/drafts',
         user: '/settings/admin/users',
@@ -135,7 +137,7 @@ describe('permsToRouter · 权限页（§5.2「映射关系不变，只改目标
 
     it('按权限键分别注入，别名跟着它那一份权限走', () => {
         const sendOnly = permsToRouter(['email:send'])
-        expect(sendOnly.filter((r) => r.name).map((r) => r.name)).toEqual(['send', 'draft'])
+        expect(sendOnly.filter((r) => r.name).map((r) => r.name)).toEqual(['compose', 'send', 'draft'])
         expect(sendOnly.filter((r) => !r.name).map((r) => r.path)).toEqual(['/sent', '/drafts'])
 
         const adminOnly = permsToRouter(['analysis:query'])

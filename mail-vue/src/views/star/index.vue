@@ -14,16 +14,15 @@
 import {ref} from 'vue'
 import {useI18n} from 'vue-i18n'
 import {MailWorkspace} from '@/components/domain'
+import {openCompose} from '@/composables/useComposer.js'
 import {emailDelete} from '@/request/email.js'
 import {starAdd, starCancel, starList} from '@/request/star.js'
 import {useEmailStore} from '@/store/email.js'
-import {useUiStore} from '@/store/ui.js'
 
 defineOptions({name: 'star'})
 
 const {t} = useI18n()
 const emailStore = useEmailStore()
-const uiStore = useUiStore()
 
 const workspace = ref(null)
 
@@ -48,7 +47,7 @@ function onStarCancel(email) {
     :on-delete="emailDelete"
     :empty-title="t('mail.emptyStar')"
     :empty-description="t('mail.emptyStarHint')"
-    @reply="uiStore.writerRef?.openReply?.($event)"
-    @forward="uiStore.writerRef?.openForward?.($event)"
+    @reply="openCompose('reply', {email: $event})"
+    @forward="openCompose('forward', {email: $event})"
   />
 </template>

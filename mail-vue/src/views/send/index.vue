@@ -12,11 +12,11 @@
 import {ref} from 'vue'
 import {useI18n} from 'vue-i18n'
 import {MailWorkspace} from '@/components/domain'
+import {openCompose} from '@/composables/useComposer.js'
 import {emailDelete, emailList} from '@/request/email.js'
 import {starAdd, starCancel} from '@/request/star.js'
 import {useAccountStore} from '@/store/account.js'
 import {useEmailStore} from '@/store/email.js'
-import {useUiStore} from '@/store/ui.js'
 import {useMailPrefs} from '@/composables/useMailPrefs.js'
 
 defineOptions({name: 'send'})
@@ -24,7 +24,6 @@ defineOptions({name: 'send'})
 const {t} = useI18n()
 const accountStore = useAccountStore()
 const emailStore = useEmailStore()
-const uiStore = useUiStore()
 const {prefs} = useMailPrefs()
 
 const workspace = ref(null)
@@ -57,7 +56,7 @@ function onStarAdd(email) {
     :show-unread="false"
     :empty-title="t('mail.emptySent')"
     :empty-description="t('mail.emptySentHint')"
-    @reply="uiStore.writerRef?.openReply?.($event)"
-    @forward="uiStore.writerRef?.openForward?.($event)"
+    @reply="openCompose('reply', {email: $event})"
+    @forward="openCompose('forward', {email: $event})"
   />
 </template>
