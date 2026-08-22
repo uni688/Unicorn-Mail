@@ -34,12 +34,14 @@ import IconTrash from '~icons/lucide/trash-2'
 import IconMailOpen from '~icons/lucide/mail-open'
 import IconClock from '~icons/lucide/clock'
 import {Button, Checkbox, Skeleton, Tooltip} from '@/components/ui'
+import {toast} from '@/components/ui/Toast/toast.js'
 import {EmptyState, ErrorState} from '@/components/composite'
 import MailRow from './MailRow.vue'
 import {useMailList, ROW} from '@/composables/useMailList.js'
 import {useVirtualRows} from '@/composables/useVirtualRows.js'
 import {useSelection} from '@/composables/useSelection.js'
 import {useMailPrefs} from '@/composables/useMailPrefs.js'
+import {useAccountStore} from '@/store/account.js'
 import {cn} from '@/utils/cn.js'
 
 const props = defineProps({
@@ -72,6 +74,7 @@ const emit = defineEmits([
 
 const {t} = useI18n()
 const {prefs, rowHeight, setDensity, setTimeSort} = useMailPrefs()
+const accountStore = useAccountStore()
 
 const list = useMailList({
     fetch: (cursor, size) => props.fetch(cursor, size),
@@ -102,6 +105,12 @@ const total = computed(() => list.total.value)
 const showEmpty = computed(() => !list.loading.value && !list.error.value && list.mails.length === 0)
 const showError = computed(() => !!list.error.value && list.mails.length === 0)
 
+/**
+ * 「全部邮箱」聚合态（`currentAccountId === 0`）：每行的时间左侧补一枚收件邮箱 Chip
+ * （§5.3.3 v1.2）。单邮箱视图里那一列永远是同一个地址，是纯噪音，所以只在聚合态显示。
+ */
+const aggregate = computed(() => !(Number(accountStore.currentAccountId) > 0))
+
 /* --------------------------------------------------------------- 取数与滚动 */
 
 list.load()
@@ -111,8 +120,21 @@ watch(virtual.atBottom, (hit) => {
     if (hit && !list.loading.value && !list.noLoading.value) list.loadMore()
 })
 
-// 切排序 = 换了一种顺序，必须重新从头取（后端的 timeSort 参数由调用方的 fetch 读 prefs）
-watch(() => prefs.timeSort, () => list.refresh())
+// 切排序 = 换了一种顺序，必须重新从头取（后端的 timeSort 参数由调用方的 fetch 读 prefs）。
+// 走**本地** refresh() 而不是 list.refresh()：只换数据不清选中的话，`selection` 里会留下一批
+// 指向已被替换行的 id、以及一个错位的键盘光标。
+watch(() => prefs.timeSort, () => refresh())
+
+/**
+ * 切邮箱必须重新拉列表（§7.4「切邮箱清空选中」+ §10.5「计数必须与列表一致」）。
+ *
+ * P2 之前这条 watch 在 `views/email/index.vue` 与 `views/send/index.vue` 里各有一份，
+ * P3 换成 `MailWorkspace` 时被删掉且没补回来：`layout/main/index.vue` 是
+ * `:key="route.name"` + keep-alive，切邮箱既不换 key 也不重挂，`select()` 在邮件路由上
+ * 又刻意跳过导航，于是列表长期停在上一个邮箱的数据上 —— 再往下翻页还会把新邮箱的一页
+ * 追加在旧邮箱的行后面（游标取自 `mails.at(-1).emailId`），两个邮箱的邮件混在同一张列表里。
+ */
+watch(() => accountStore.currentAccountId, () => refresh())
 
 function refresh() {
     selection.clear()
@@ -142,7 +164,10 @@ function toggleStar(email) {
 const {copy} = useClipboard({legacy: true})
 
 function copyCode(code) {
-    copy(String(code ?? ''))
+    // §5.3.3：验证码 Badge「点击复制并 Toast」—— 复制这种没有视觉结果的动作必须有回执
+    Promise.resolve(copy(String(code ?? '')))
+        .then(() => toast.success(t('copySuccessMsg')))
+        .catch(() => {})
 }
 
 /** 批量动作作用于「勾选的那些」，一个都没勾时作用于光标行 —— 空手点删除什么都不该发生 */
@@ -339,7 +364,8 @@ defineExpose({
             :show-unread="showUnread"
             :show-star="showStar"
             :show-status="showStatus"
-            :show-preview="prefs.density === 'roomy' || prefs.density === 'cozy'"
+            :show-preview="prefs.density === 'roomy'"
+            :show-mailbox="aggregate"
             :code-label="t('codeLabel')"
             :star-label="item.row.email.isStar ? t('mail.unstar') : t('mail.star')"
             :select-label="t('mail.selectOne')"

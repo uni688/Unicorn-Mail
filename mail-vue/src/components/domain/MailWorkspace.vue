@@ -18,7 +18,7 @@
  *
  * 已读的时机沿用旧实现：**打开就标已读**（`emailRead`），并同步更新侧栏角标。
  */
-import {computed, onUnmounted, ref, watch} from 'vue'
+import {computed, onActivated, onDeactivated, onMounted, onUnmounted, ref, watch} from 'vue'
 import {useRoute, useRouter} from 'vue-router'
 import {MailList, MailReader} from '@/components/domain'
 import {useBreakpoint} from '@/composables/useBreakpoint.js'
@@ -107,19 +107,34 @@ function close() {
 }
 
 /** 刷新页面 / 直接贴地址进来：从已加载的列表里找回那一封 */
+function resolveDeepLink(id) {
+    if (!id) return
+    if (String(active.value?.emailId ?? '') === String(id)) return
+    const hit = listRef.value?.mails?.find((mail) => String(mail.emailId) === String(id))
+    if (hit) active.value = hit
+}
+
 watch(
-    () => [route.params.emailId, listRef.value?.mails?.length],
-    ([id]) => {
+    () => route.params.emailId,
+    (id) => {
         if (!id) {
             active.value = null
             return
         }
-        if (String(active.value?.emailId ?? '') === String(id)) return
-        const hit = listRef.value?.mails?.find((mail) => String(mail.emailId) === String(id))
-        if (hit) active.value = hit
+        resolveDeepLink(id)
     },
     {immediate: true},
 )
+
+/**
+ * 列表长度变了之后再试一次：深链指向的邮件可能要翻到第二页才回来。
+ *
+ * 这一条**不能**和上面那条合成一个数组 watch：那样翻页 / `removeIds` 会以
+ * `id === undefined` 触发回调并命中 `active.value = null`，
+ * 用户正在读的邮件会因为「列表多了一页」自己关掉（`/mail/sent` 因为缺 `:emailId?` 段，
+ * 每一次翻页都会踩到）。
+ */
+watch(() => listRef.value?.mails?.length, () => resolveDeepLink(route.params.emailId))
 
 /* ------------------------------------------------------------------ 动作 */
 
@@ -130,9 +145,21 @@ function afterMutation(ids) {
     refreshCounts()
 }
 
+/**
+ * 三个变更动作共用的入口。空 id 一律当作「什么都不做」：
+ * `purge([])` / `purge([undefined])` 在后端是 `?emailIds=`，从前是「清空整个回收站」的写法
+ * （见审计 P1-2），一次意图为「删这一封」的点击可以清掉整个回收站。
+ * 前后端各挡一次，这里挡的是「窗格里根本没有打开邮件时按下了按钮」。
+ */
+function toIds(ids) {
+    return [...new Set((Array.isArray(ids) ? ids : [ids])
+        .map(Number)
+        .filter((id) => Number.isInteger(id) && id > 0))]
+}
+
 function del(ids) {
-    if (!props.onDelete) return
-    const list = [...ids]
+    const list = toIds(ids)
+    if (!props.onDelete || list.length === 0) return
     props.onDelete(list)
         .then(() => {
             afterMutation(list)
@@ -143,14 +170,14 @@ function del(ids) {
 }
 
 function restore(ids) {
-    if (!props.onRestore) return
-    const list = [...ids]
+    const list = toIds(ids)
+    if (!props.onRestore || list.length === 0) return
     props.onRestore(list).then(() => afterMutation(list)).catch(() => {})
 }
 
 function purge(ids) {
-    if (!props.onPurge) return
-    const list = [...ids]
+    const list = toIds(ids)
+    if (!props.onPurge || list.length === 0) return
     props.onPurge(list).then(() => afterMutation(list)).catch(() => {})
 }
 
@@ -160,16 +187,9 @@ function afterStar() {
 }
 
 function markRead(ids) {
+    if (!ids?.length) return
     listRef.value?.localUnread(ids, EmailUnreadEnum.READ)
     emailRead([...ids]).then(() => refreshCounts()).catch(() => {})
-}
-
-function markUnread(ids) {
-    listRef.value?.localUnread(ids, EmailUnreadEnum.UNREAD)
-    if (active.value && ids.some((id) => String(id) === String(active.value.emailId))) {
-        active.value.unread = EmailUnreadEnum.UNREAD
-    }
-    emailUnread([...ids]).then(() => refreshCounts()).catch(() => {})
 }
 
 /** 阅读窗格里的星标：优先走列表的乐观切换，两处状态才不会分叉 */
@@ -199,10 +219,24 @@ function toggleStar(email, next) {
 const actionIds = () => {
     const ids = listRef.value?.selection?.ids?.value ?? []
     if (ids.length) return [...ids]
-    return active.value ? [active.value.emailId] : []
+    return activeIds()
 }
 
-const unregister = registerMailActions({
+/** 窗格里正在看的那一封；没有就是空数组 —— `MailReader` 的 v-if 只看 paneMode，不看 active */
+function activeIds() {
+    return active.value?.emailId ? [active.value.emailId] : []
+}
+
+function markUnread(ids) {
+    if (!ids?.length) return
+    listRef.value?.localUnread(ids, EmailUnreadEnum.UNREAD)
+    if (active.value && ids.some((id) => String(id) === String(active.value.emailId))) {
+        active.value.unread = EmailUnreadEnum.UNREAD
+    }
+    emailUnread([...ids]).then(() => refreshCounts()).catch(() => {})
+}
+
+const mailActionHandlers = {
     'mark-read': () => {
         const ids = actionIds()
         if (ids.length) markRead(ids)
@@ -227,21 +261,56 @@ const unregister = registerMailActions({
         const row = listRef.value?.mails?.find((mail) => mail.emailId === ids[0])
         if (row?.code) navigator.clipboard?.writeText?.(String(row.code))
     },
-})
+}
+
+/**
+ * 注册 / 注销必须走 `onActivated` / `onDeactivated`，不能只在 setup 里注册一次。
+ *
+ * `layout/main/index.vue` 让 email / star / send / trash 四个视图常驻 keep-alive，
+ * `onUnmounted` 永不触发：只在 setup 注册的话，`state.handlers` 会一直指向**最后一个挂载过**的
+ * workspace，而不是当前可见的那个。于是「在收件箱选中几封 → 点命令条的删除」实际执行的是
+ * 回收站那份 handler（`trashMode` 为真 → 物理删除），删掉的是回收站里的邮件。
+ *
+ * 两个钩子在 keep-alive 下成对触发；不在 keep-alive 里的宿主只会走 mounted/unmounted，
+ * 所以四个钩子都挂上，`claim` 自身是幂等的（先注销旧的再注册）。
+ */
+let unregister = null
+const owningActions = ref(false)
+
+function claimActions() {
+    unregister?.()
+    unregister = registerMailActions(mailActionHandlers)
+    owningActions.value = true
+    pushSelection()
+}
+
+function releaseActions() {
+    unregister?.()
+    unregister = null
+    owningActions.value = false
+}
+
+onMounted(claimActions)
+onActivated(claimActions)
+onDeactivated(releaseActions)
+onUnmounted(releaseActions)
+
+/** 把选中数推给命令条。只有「自己是当前列表」时才推，否则会替别人的列表改数字 */
+function pushSelection() {
+    if (!owningActions.value) return
+    const ids = listRef.value?.selection?.ids?.value ?? []
+    const row = listRef.value?.mails?.find((mail) => mail.emailId === ids[0])
+    setMailSelection({count: ids.length, hasCode: !!row?.code})
+}
 
 watch(
     () => {
         const ids = listRef.value?.selection?.ids?.value ?? []
         return {count: ids.length, first: ids[0]}
     },
-    ({count, first}) => {
-        const row = listRef.value?.mails?.find((mail) => mail.emailId === first)
-        setMailSelection({count, hasCode: !!row?.code})
-    },
+    () => pushSelection(),
     {deep: true},
 )
-
-onUnmounted(unregister)
 
 defineExpose({
     addItem: (email) => listRef.value?.addItem(email),
@@ -303,12 +372,12 @@ defineExpose({
       :show-back="paneMode === 'full'"
       class="min-w-0 flex-1"
       @back="close"
-      @delete="del([active.emailId])"
-      @restore="restore([active.emailId])"
-      @purge="purge([active.emailId])"
+      @delete="del(activeIds())"
+      @restore="restore(activeIds())"
+      @purge="purge(activeIds())"
       @star="toggleStar(active, 1)"
       @unstar="toggleStar(active, 0)"
-      @unread="markUnread([active.emailId])"
+      @unread="markUnread(activeIds())"
       @reply="emit('reply', active)"
       @forward="emit('forward', active)"
     />

@@ -124,4 +124,54 @@ describe('MailRow', () => {
         expect(wrapper.emitted('contextmenu')).toHaveLength(1)
         expect(wrapper.emitted('contextmenu')[0][1].emailId).toBe(1)
     })
+
+    /* --------------------------------- 多行版式（§5.3.3；审计「与文档设计不符」） */
+
+    it('舒适档（72）多一行摘要，紧凑档（44）没有', () => {
+        expect(mountRow({height: 72}).text()).toContain('本月共计 42 元')
+        expect(mountRow({height: 44}).text()).not.toContain('本月共计 42 元')
+    })
+
+    it('56px 档放不下三行，所以传了 showPreview 也不画摘要', () => {
+        expect(mountRow({height: 56, showPreview: true}).text()).not.toContain('本月共计 42 元')
+    })
+
+    it('未读点紧挨在主题前面（不是在头像 / 发件人前面）', () => {
+        const wrapper = mountRow({email: mail({unread: 0})})
+        const dot = wrapper.find('.bg-accent.rounded-full, .rounded-full.bg-accent')
+        expect(dot.exists()).toBe(true)
+        // 同一行里紧跟着的就是主题
+        expect(dot.element.nextElementSibling.textContent).toContain('8 月发票')
+    })
+
+    it('发件人和时间在第一行，主题在第二行（三列网格 20/20/1fr）', () => {
+        const wrapper = mountRow()
+        expect(wrapper.classes().join(' ')).toContain('grid-cols-[20px_20px_minmax(0,1fr)]')
+        const time = wrapper.findAll('span').find((s) => s.attributes('title'))
+        const line1 = time.element.parentElement
+        expect(line1.textContent).toContain('Stripe')
+        expect(line1.textContent).not.toContain('8 月发票')
+    })
+
+    it('星标：没加星时藏在 hover 后面，加了星常显实心', () => {
+        const plain = mountRow().find('button[aria-label="星标"]')
+        expect(plain.classes().join(' ')).toContain('opacity-0')
+
+        const starred = mountRow({email: mail({isStar: 1})}).find('button[aria-label="星标"]')
+        expect(starred.classes().join(' ')).not.toContain('opacity-0')
+        expect(starred.html()).toContain('fill-accent')
+    })
+
+    it('showMailbox 才显示收件邮箱 Chip，截断到 12 字符且 Tooltip 给全称', () => {
+        const email = mail({type: 0, toEmail: 'someone.very.long@example.com'})
+        expect(mountRow({email}).text()).not.toContain('someone.very')
+        expect(mountRow({email, showMailbox: true}).text()).toContain('someone.very…')
+    })
+
+    it('已发送邮件（type=1）的 Chip 显示的是发信邮箱', () => {
+        const email = mail({type: 1, sendEmail: 'me@uni.com', toEmail: 'you@other.com'})
+        const text = mountRow({email, showMailbox: true}).text()
+        expect(text).toContain('me@uni.com')
+        expect(text).not.toContain('you@other.com')
+    })
 })
