@@ -7,6 +7,7 @@ import email from '../entity/email';
 import { isDel } from '../const/entity-const';
 import attService from "./att-service";
 import { t } from '../i18n/i18n'
+import { pageSize } from '../utils/page-utils';
 const starService = {
 
 	async add(c, params, userId) {
@@ -43,7 +44,7 @@ const starService = {
 	async list(c, params, userId) {
 		let { emailId, size } = params;
 		emailId = Number(emailId);
-		size = Number(size);
+		size = pageSize(size);
 
 		if (!emailId) {
 			emailId = 9999999999;

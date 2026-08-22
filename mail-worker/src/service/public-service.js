@@ -14,6 +14,7 @@ import { isDel, roleConst } from '../const/entity-const';
 import email from '../entity/email';
 import userService from './user-service';
 import KvConst from '../const/kv-const';
+import { pageSize, pageNum } from '../utils/page-utils';
 
 const publicService = {
 
@@ -35,16 +36,8 @@ const publicService = {
 				isDel: email.isDel,
 		}).from(email)
 
-		if (!size) {
-			size = 20
-		}
-
-		if (!num) {
-			num = 1
-		}
-
-		size = Number(size);
-		num = Number(num);
+		size = pageSize(size, 20, 50);
+		num = pageNum(num);
 
 		num = (num - 1) * size;
 

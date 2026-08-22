@@ -14,6 +14,7 @@ import roleService from './role-service';
 import emailUtils from '../utils/email-utils';
 import saltHashUtils from '../utils/crypto-utils';
 import constant from '../const/constant';
+import { pageSize, pageNum } from '../utils/page-utils';
 import { t } from '../i18n/i18n'
 import reqUtils from '../utils/req-utils';
 import {oauth} from "../entity/oauth";
@@ -111,13 +112,10 @@ const userService = {
 
 		let { num, size, email, timeSort, status } = params;
 
-		size = Number(size);
-		num = Number(num);
+		size = pageSize(size);
+		num = pageNum(num);
 		timeSort = Number(timeSort);
 		params.isDel = Number(params.isDel);
-		if (size > 50) {
-			size = 50;
-		}
 
 		num = (num - 1) * size;
 

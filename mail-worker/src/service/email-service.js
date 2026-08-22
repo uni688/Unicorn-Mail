@@ -22,6 +22,57 @@ import domainUtils from '../utils/domain-uitls';
 import account from "../entity/account";
 import { att } from '../entity/att';
 import telegramService from './telegram-service';
+import { pageSize } from '../utils/page-utils';
+
+/**
+ * 解析「这次查询要不要跨邮箱聚合」。
+ *
+ * `accountId = 0` 是前端「全部邮箱」的约定值（`account_id` 自增从 1 起，不存在 0），
+ * 所以它只能是聚合语义，绝不能退化成 `email.account_id = 0`（那是必然为空的查询），
+ * 更不能拿 `undefined.allReceive` 去解引用（那是 500）。
+ *
+ * 三种入参各自的归宿：
+ *   - 显式传了 `allReceive` → 听前端的
+ *   - 没传且 `accountId` 为 0 / 空 → 聚合（1）
+ *   - 没传且 `accountId` 有值 → 查这个邮箱的 `allReceive`，查不到就是非法邮箱，报错而不是静默给空
+ */
+async function resolveAllReceive(c, accountId, allReceive) {
+	const explicit = Number(allReceive);
+	if (!isNaN(explicit)) return explicit;
+	if (!accountId) return 1;
+	const accountRow = await accountService.selectById(c, accountId);
+	if (!accountRow) throw new BizError(t('noUserAccount'));
+	return Number(accountRow.allReceive);
+}
+
+/**
+ * 给软删 / 还原的行同步 `email.del_time`（回收站 30 天清理的计时列）。
+ *
+ * 这一列刻意不进 drizzle 实体：`select({...email})` 到处在用，实体里多一列，
+ * 没跑过 `v3_1DB()` 的库每一次列表查询都会 500。所以只在这里用裸 SQL 点对点地写它，
+ * 并且**吞掉「列不存在」**——删除 / 还原本身必须成功，计时列是附加能力。
+ *
+ * `stamp` 为 true 表示进回收站（盖时间戳），false 表示还原（清时间戳）。
+ * 清时间戳是必须的：不清的话这一行会一直带着上一次删除的日期，
+ * 下一次删除时 cron 的「补时间戳」跳过它、「删满 30 天」却命中它 —— 当晚就被物理删除。
+ */
+async function syncDelTime(c, userId, emailIds, stamp) {
+	if (!emailIds || emailIds.length === 0) return;
+	const CHUNK = 100;
+	try {
+		for (let i = 0; i < emailIds.length; i += CHUNK) {
+			const chunk = emailIds.slice(i, i + CHUNK);
+			const placeholders = chunk.map(() => '?').join(',');
+			await c.env.db.prepare(
+				`UPDATE email SET del_time = ${stamp ? 'CURRENT_TIMESTAMP' : 'NULL'}
+				 WHERE user_id = ? AND email_id IN (${placeholders})`
+			).bind(userId, ...chunk).run();
+		}
+	} catch (e) {
+		if (!/no such column/i.test(e.message)) throw e;
+		console.warn(`del_time 未同步：缺少 email.del_time 列，请重新执行 /api/init/:secret`);
+	}
+}
 
 const emailService = {
 
@@ -29,15 +80,10 @@ const emailService = {
 
 		let { emailId, type, accountId, size, timeSort, allReceive } = params;
 
-		size = Number(size);
+		size = pageSize(size);
 		emailId = Number(emailId);
 		timeSort = Number(timeSort);
 		accountId = Number(accountId);
-		allReceive = Number(allReceive);
-
-		if (size > 50) {
-			size = 50;
-		}
 
 		if (!emailId) {
 
@@ -49,10 +95,7 @@ const emailService = {
 
 		}
 
-		if (isNaN(allReceive)) {
-			let accountRow = await accountService.selectById(c, accountId);
-			allReceive = accountRow.allReceive;
-		}
+		allReceive = await resolveAllReceive(c, accountId, allReceive);
 
 		const query = orm(c)
 			.select({
@@ -136,12 +179,17 @@ const emailService = {
 
 	async delete(c, params, userId) {
 		const { emailIds } = params;
-		const emailIdList = emailIds.split(',').map(Number);
+		const emailIdList = this.toEmailIds(emailIds);
+		if (emailIdList.length === 0) {
+			return;
+		}
 		await orm(c).update(email).set({ isDel: isDel.DELETE }).where(
 			and(
 				eq(email.userId, userId),
 				inArray(email.emailId, emailIdList)))
 			.run();
+		// 进回收站的当下就盖时间戳，cron 不必再靠「补 NULL」这一步猜什么时候被删的
+		await syncDelTime(c, userId, emailIdList, true);
 	},
 
 	receive(c, params, cidAttList, r2domain) {
@@ -252,7 +300,9 @@ const emailService = {
 
 			emailRow = await this.selectById(c, emailId);
 
-			if (!emailRow) {
+			// selectById 只按 emailId 查，必须自己核对归属：否则任意 id 都能回复，
+			// 响应里带回受害者的 messageId（inReplyTo / relation），等于一个 id → Message-ID 的预言机
+			if (!emailRow || emailRow.userId !== userId) {
 				throw new BizError(t('notExistEmailReply'));
 			}
 
@@ -546,7 +596,14 @@ const emailService = {
 		const { noRecipient  } = await settingService.query(c);
 
 		//查询所有收件人账号信息
-		let accountList = await orm(c).select().from(account).where(inArray(account.email, receiveEmail)).all();
+		//地址大小写不敏感（与 accountService.selectByEmailIncludeDel 一致），且不投递给已软删的邮箱：
+		//精确匹配会把发给 Alice@ 的站内信判成「无此收件人」，而软删邮箱会收到一封 list()/trashList()
+		//永远过滤掉的邮件 —— 两种都是黑洞，且发件人那一侧仍被标记为 DELIVERED
+		let accountList = receiveEmail.length === 0 ? [] : await orm(c).select().from(account).where(
+			and(
+				or(...receiveEmail.map(addr => sql`${account.email} COLLATE NOCASE = ${addr}`)),
+				eq(account.isDel, isDel.NORMAL)
+			)).all();
 
 		//查询所有收件人权限身份
 		const userIds = accountList.map(accountRow => accountRow.userId);
@@ -565,7 +622,8 @@ const emailService = {
 			emailValues.toName = emailUtils.getName(email);
 			emailValues.emailId = null;
 
-			const accountRow = accountList.find(accountRow => accountRow.email === email);
+			// 查询用了 COLLATE NOCASE，这里的回填也必须大小写不敏感，否则查到了却匹配不上
+			const accountRow = accountList.find(accountRow => accountRow.email?.toLowerCase() === email.toLowerCase());
 
 			//如果收件人存在就把邮件信息改成收件人的
 			if (accountRow) {
@@ -702,12 +760,8 @@ const emailService = {
 
 	async latest(c, params, userId) {
 		let { emailId, accountId, allReceive } = params;
-		allReceive = Number(allReceive);
-
-		if (isNaN(allReceive)) {
-			let accountRow = await accountService.selectById(c, accountId);
-			allReceive = accountRow.allReceive;
-		}
+		accountId = Number(accountId);
+		allReceive = await resolveAllReceive(c, accountId, allReceive);
 
 		let list = await orm(c).select({...email}).from(email)
 			.leftJoin(
@@ -773,14 +827,10 @@ const emailService = {
 
 		let { emailId, size, name, subject, accountEmail, userEmail, type, timeSort } = params;
 
-		size = Number(size);
+		size = pageSize(size);
 
 		emailId = Number(emailId);
 		timeSort = Number(timeSort);
-
-		if (size > 50) {
-			size = 50;
-		}
 
 		if (!emailId) {
 
@@ -918,6 +968,13 @@ const emailService = {
 
 	async restoreByUserId(c, userId) {
 		await orm(c).update(email).set({ isDel: isDel.NORMAL }).where(eq(email.userId, userId)).run();
+		// 与 restore() 同理：整户还原也要把计时列清空，否则这些行下次被删即到期
+		try {
+			await c.env.db.prepare(`UPDATE email SET del_time = NULL WHERE user_id = ?`).bind(userId).run();
+		} catch (e) {
+			if (!/no such column/i.test(e.message)) throw e;
+			console.warn(`del_time 未同步：缺少 email.del_time 列，请重新执行 /api/init/:secret`);
+		}
 	},
 
 	async completeReceive(c, status, emailId) {
@@ -1028,13 +1085,15 @@ const emailService = {
 
 			const rows = await orm(c).select({ accountId: email.accountId, num: count() })
 				.from(email)
+				.leftJoin(account, eq(account.accountId, email.accountId))
 				.where(
 					and(
 						eq(email.userId, userId),
 						inArray(email.accountId, ids),
 						eq(email.type, emailConst.type.RECEIVE),
 						eq(email.unread, emailConst.unread.UNREAD),
-						eq(email.isDel, isDel.NORMAL)
+						eq(email.isDel, isDel.NORMAL),
+						eq(account.isDel, isDel.NORMAL)
 					))
 				.groupBy(email.accountId)
 				.all();
@@ -1046,7 +1105,8 @@ const emailService = {
 		all = Number(all);
 		accountId = Number(accountId);
 
-		let allReceive = all === 1;
+		// `accountId=0` 是前端「全部邮箱」的约定值，和 `all=1` 同义（见 resolveAllReceive）
+		let allReceive = all === 1 || !accountId;
 
 		if (!allReceive) {
 
@@ -1108,24 +1168,16 @@ const emailService = {
 
 		let { emailId, accountId, size, type, allReceive } = params;
 
-		size = Number(size);
+		size = pageSize(size);
 		emailId = Number(emailId);
 		accountId = Number(accountId);
-		allReceive = Number(allReceive);
 		type = type === undefined || type === '' ? undefined : Number(type);
-
-		if (size > 50 || !size || Number.isNaN(size)) {
-			size = 50;
-		}
 
 		if (!emailId) {
 			emailId = 9999999999;
 		}
 
-		if (Number.isNaN(allReceive)) {
-			const accountRow = await accountService.selectById(c, accountId);
-			allReceive = accountRow ? accountRow.allReceive : 0;
-		}
+		allReceive = await resolveAllReceive(c, accountId, allReceive);
 
 		const scope = (...extra) => and(
 			allReceive ? eq(1, 1) : eq(email.accountId, accountId),
@@ -1176,22 +1228,33 @@ const emailService = {
 				eq(email.isDel, isDel.DELETE),
 				inArray(email.emailId, emailIds)))
 			.run();
+
+		// 还原必须清掉计时列，否则这封邮件下次被删时会被 cron 按「上次删除日期」立即物理删除
+		await syncDelTime(c, userId, emailIds, false);
 	},
 
 	/**
-	 * 增量 2：彻底删除。这是用户侧唯一的物理删除入口，误传 id 就是真丢数据，
-	 * 所以先按 `userId + isDel=DELETE` 把 id 捞回来，只删捞到的那些；
-	 * `emailIds` 不传 = 清空回收站。
+	 * 增量 2：彻底删除。这是用户侧唯一的物理删除入口，误传 id 就是真丢数据。
+	 *
+	 * 「清空回收站」必须是**显式意图**（`all=1`），不能由「id 列表为空」推断出来：
+	 * `toEmailIds()` 分不清「没传 id」和「传了 id 但全部非法」，前端一个
+	 * `purge([undefined])` / `?emailIds=` 就会把整个回收站连附件一起清掉。
+	 * 唯一不可逆的操作，默认值必须是「什么都不做」。
 	 */
 	async purge(c, params, userId) {
 
 		const emailIds = this.toEmailIds(params.emailIds);
+		const purgeAll = Number(params.all) === 1;
+
+		if (!purgeAll && emailIds.length === 0) {
+			return;
+		}
 
 		const rows = await orm(c).select({ emailId: email.emailId }).from(email).where(
 			and(
 				eq(email.userId, userId),
 				eq(email.isDel, isDel.DELETE),
-				emailIds.length > 0 ? inArray(email.emailId, emailIds) : undefined))
+				purgeAll ? undefined : inArray(email.emailId, emailIds)))
 			.all();
 
 		await this.physicsDeleteEmailIds(c, rows.map(row => row.emailId));
@@ -1246,20 +1309,23 @@ const emailService = {
 	 * 计时用的是新增列 `email.del_time`，**不是** `create_time` —— 拿收件时间算，
 	 * 一封两年前的邮件今天删掉今晚就被真删了。
 	 *
-	 * `delete()` 一个字没改，代价是新进回收站的邮件要等下一次 cron 才被盖上时间戳：
-	 * 这里先给所有 `del_time IS NULL` 的补时间戳，再删满 30 天的。所以实际保留期是
-	 * 30 天 + 最多一个 cron 间隔（当前一天一次），只会多留、不会早删。
+	 * `delete()` 现在进回收站时就写 `del_time`，所以这里的「补时间戳」只服务两类历史行：
+	 * v3.1 之前删掉的，和 `del_time` 列刚加上时已经在回收站里的。补写同样限量 500 行，
+	 * 避免首次部署时一条无界 UPDATE 打穿 D1 的单语句预算；剩下的下一次 cron 继续补。
 	 *
 	 * `del_time` 是 `v3_1DB()` 加的列。没跑过 init 的库这里会抛「no such column」，
-	 * 捕获后只打警告：清不了回收站不该拖垮 `scheduled()` 里其它的日常任务。
+	 * 那一种情况只打警告（清不了回收站不该拖垮 `scheduled()` 里其它日常任务）；
+	 * 其它异常必须抛出去 —— 否则物理删除中途失败会留下「附件已删、邮件行还在」的孤立状态，
+	 * 而日志上只有一条无关的 schema 警告。
 	 */
 	async clearTrash(c, days = 30, limit = 500) {
 
 		try {
 
 			await c.env.db.prepare(
-				`UPDATE email SET del_time = CURRENT_TIMESTAMP WHERE is_del = 1 AND del_time IS NULL`
-			).run();
+				`UPDATE email SET del_time = CURRENT_TIMESTAMP
+				 WHERE email_id IN (SELECT email_id FROM email WHERE is_del = 1 AND del_time IS NULL LIMIT ?)`
+			).bind(Number(limit)).run();
 
 			const { results } = await c.env.db.prepare(
 				`SELECT email_id FROM email WHERE is_del = 1 AND del_time IS NOT NULL AND del_time <= datetime('now', ?) LIMIT ?`
@@ -1268,8 +1334,12 @@ const emailService = {
 			return await this.physicsDeleteEmailIds(c, (results ?? []).map(row => row.email_id));
 
 		} catch (e) {
-			console.warn(`回收站清理跳过：${e.message}（缺少 email.del_time 列时请重新执行 /api/init/:secret）`);
-			return 0;
+			if (/no such column/i.test(e.message)) {
+				console.warn(`回收站清理跳过：缺少 email.del_time 列，请重新执行 /api/init/:secret`);
+				return 0;
+			}
+			console.error(`回收站清理失败：${e.message}`);
+			throw e;
 		}
 	}
 };
