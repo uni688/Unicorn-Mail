@@ -173,11 +173,19 @@ describe('useMailboxes · select / recent / remove', () => {
         expect(accountStore.currentAccount).toStrictEqual(target)
     })
 
-    it('「全部邮箱」把 accountId 归 0、currentAccount 清空，也不进最近', () => {
+    /**
+     * 「全部邮箱」写的是 `{...ALL_MAILBOXES}` 而不是 `{}`（审计 P0-1）：
+     * `views/*` 是从 `currentAccount.allReceive` 取参数发给 `/email/list` 的，
+     * 空对象让这个参数变成 undefined，后端会去查一个不存在的 account 行并 500。
+     */
+    it('「全部邮箱」把 accountId 归 0、currentAccount 是带 allReceive 的聚合项，也不进最近', () => {
         mb.select(box(7))
         mb.select(ALL_MAILBOXES)
         expect(accountStore.currentAccountId).toBe(0)
-        expect(accountStore.currentAccount).toEqual({})
+        expect(accountStore.currentAccount).toEqual({...ALL_MAILBOXES})
+        expect(accountStore.currentAccount.allReceive).toBe(1)
+        // 同一个对象被两处引用会互相写坏，所以必须是副本
+        expect(accountStore.currentAccount).not.toBe(ALL_MAILBOXES)
         expect(useMailPrefs().prefs.recent.map(r => r.accountId)).toEqual([7])
     })
 

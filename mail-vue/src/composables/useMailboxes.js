@@ -195,8 +195,14 @@ function resetMailboxes() {
     cursor = {sort: NaN, accountId: 0}
 }
 
-/** 「全部邮箱」这一项：accountId 0 → `/email/list` 走 `allReceive=1`，后端不需要改 */
-export const ALL_MAILBOXES = {accountId: 0, email: '', name: '', all: true}
+/**
+ * 「全部邮箱」这一项。
+ *
+ * `accountId: 0` 是和后端的约定值（`account_id` 自增从 1 起，不存在 0），
+ * `allReceive: 1` 必须一起带上：`views/email/index.vue` 是从 `currentAccount.allReceive`
+ * 取这个参数发给 `/email/list` 的，缺了它后端只能去查一个不存在的 account 行。
+ */
+export const ALL_MAILBOXES = {accountId: 0, email: '', name: '', allReceive: 1, all: true}
 
 export function useMailboxes() {
 
@@ -224,7 +230,9 @@ export function useMailboxes() {
         const accountId = Number(target.accountId) || 0
 
         accountStore.currentAccountId = accountId
-        accountStore.currentAccount = accountId > 0 ? target : {}
+        // 「全部邮箱」也必须写一个**带 allReceive 的**对象：写 `{}` 的话
+        // `currentAccount?.allReceive` 是 undefined，axios 会把这个参数整个丢掉
+        accountStore.currentAccount = accountId > 0 ? target : {...ALL_MAILBOXES}
 
         if (accountId > 0) pushRecent(target)
         return target

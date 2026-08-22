@@ -69,6 +69,7 @@ import {accountSetName} from "@/request/account.js";
 import {useAccountStore} from "@/store/account.js";
 import {useI18n} from "vue-i18n";
 import {useSettingStore} from "@/store/setting.js";
+import {endSession} from "@/utils/session.js";
 
 const { t } = useI18n()
 const accountStore = useAccountStore()
@@ -146,8 +147,8 @@ const deleteConfirm = () => {
     type: 'warning'
   }).then(() => {
     userDelete().then(() => {
-      localStorage.removeItem('token');
-      router.replace('/login');
+      // 账号已经注销了，内存里再留着它的邮箱 / 角标 / recent 只会误导下一个登录的人
+      endSession();
       ElMessage({
         message: t('delSuccessMsg'),
         type: 'success',

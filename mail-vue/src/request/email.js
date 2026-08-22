@@ -52,11 +52,23 @@ export function emailRestore(emailIds) {
 }
 
 /**
- * 物理删除。不传 emailIds = 清空整个回收站，后端会重新按 userId + is_del 取一遍 id，
- * 前端传什么都越不出自己的回收站。
+ * 物理删除指定的邮件。
+ *
+ * 空 id **不会**变成「清空回收站」：`String([]) === ''`，从前这里发出去的是
+ * `?emailIds=`，后端当作「没传 id」→ 清空整个回收站（含 R2 附件，不可恢复）。
+ * 现在传不出合法 id 就直接不发请求，「清空回收站」由 `emailPurgeAll()` 显式表达。
  */
 export function emailPurge(emailIds) {
-    return http.delete('/email/purge', {params: emailIds ? {emailIds: String(emailIds)} : {}})
+    const ids = [...new Set((Array.isArray(emailIds) ? emailIds : [emailIds])
+        .map(Number)
+        .filter(id => Number.isInteger(id) && id > 0))]
+    if (ids.length === 0) return Promise.resolve()
+    return http.delete('/email/purge', {params: {emailIds: ids.join(',')}})
+}
+
+/** 清空整个回收站。`all=1` 是唯一能触发全量物理删除的写法，必须由调用方显式说出口 */
+export function emailPurgeAll() {
+    return http.delete('/email/purge', {params: {all: 1}})
 }
 
 /** 标记未读（既有的 /email/read 是单向的） */

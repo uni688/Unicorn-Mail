@@ -19,7 +19,7 @@ import {useI18n} from 'vue-i18n'
 import IconTrash from '~icons/lucide/trash-2'
 import {AlertDialog, Button} from '@/components/ui'
 import {MailWorkspace} from '@/components/domain'
-import {emailPurge, emailRestore, emailTrashList} from '@/request/email.js'
+import {emailPurge, emailPurgeAll, emailRestore, emailTrashList} from '@/request/email.js'
 import {useAccountStore} from '@/store/account.js'
 import {useCounts} from '@/composables/useCounts.js'
 import {hasPerm} from '@/perm/perm.js'
@@ -42,10 +42,13 @@ function fetchList(cursor, size) {
     return emailTrashList(accountId, allReceive, cursor, size)
 }
 
-/** 清空整个回收站：后端不看前端传的 id，自己按 userId + is_del 重新取一遍 */
+/**
+ * 清空整个回收站。走**专用**的 `all=1` 接口而不是「不传 id 的 emailPurge」：
+ * 后者的语义现在是「什么都不做」，全量物理删除必须显式说出口（审计 P1-2）。
+ */
 function purgeAll() {
     purging.value = true
-    emailPurge()
+    emailPurgeAll()
         .then(() => {
             confirmOpen.value = false
             workspace.value?.refresh()

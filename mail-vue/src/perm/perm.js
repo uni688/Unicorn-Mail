@@ -88,7 +88,9 @@ const routers = {
             }
         },
         {
-            path: '/mail/sent',
+            // `:emailId?` 与 inbox / starred / trash 一致：少了这一段，`router.replace`
+            // 会被 matcher 按 key 过滤掉 emailId，已发送邮件既不能深链也不能刷新恢复
+            path: '/mail/sent/:emailId?',
             name: 'send',
             component: () => import('@/views/send/index.vue'),
             meta: {

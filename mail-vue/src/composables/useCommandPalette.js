@@ -54,6 +54,7 @@ import {useAccountStore} from '@/store/account.js'
 import {useSettingStore} from '@/store/setting.js'
 import {toast} from '@/components/ui/Toast/toast.js'
 import {logout} from '@/request/login.js'
+import {endSession} from '@/utils/session.js'
 import {setExtend} from '@/utils/day.js'
 import {openShortcuts} from '@/composables/useShortcutsDialog.js'
 import {useMailboxes} from '@/composables/useMailboxes.js'
@@ -279,8 +280,8 @@ export function useCommandPalette() {
         try {
             await logout()
         } finally {
-            localStorage.removeItem('token')
-            router.replace('/login')
+            // 与 `Topbar.vue` 同一个出口：跳登录页 + 清 token / store / 模块单例（审计 P2-5）
+            await endSession()
         }
     }
 

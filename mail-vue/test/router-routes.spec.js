@@ -89,7 +89,9 @@ describe('permsToRouter · 权限页（§5.2「映射关系不变，只改目标
     const PAGES = {
         // 写信页跟着 `email:send` 注入（§7.7 整页写信），`menu: false` —— 不进导航
         compose: '/mail/compose',
-        send: '/mail/sent',
+        // `:emailId?` 与 inbox / starred / trash 一致（审计 P2-7）：少了这一段，
+        // `router.replace` 会被 matcher 按 key 过滤掉 emailId，已发送邮件不能深链
+        send: '/mail/sent/:emailId?',
         draft: '/mail/drafts',
         user: '/settings/admin/users',
         role: '/settings/admin/roles',

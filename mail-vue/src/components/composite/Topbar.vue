@@ -52,6 +52,7 @@ import {useUserStore} from '@/store/user.js'
 import {useSettingStore} from '@/store/setting.js'
 import {hasPerm} from '@/perm/perm.js'
 import {logout} from '@/request/login.js'
+import {endSession} from '@/utils/session.js'
 import {cn} from '@/utils/cn.js'
 
 const props = defineProps({
@@ -118,8 +119,9 @@ async function doLogout() {
     try {
         await logout()
     } finally {
-        localStorage.removeItem('token')
-        router.replace('/login')
+        // 只删 token 不够：邮箱列表 / 角标 / recent 都是模块级单例，
+        // 不刷新页面换人登录会把上一个账号的数据带进新会话（审计 P2-5）
+        endSession()
     }
 }
 </script>
