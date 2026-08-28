@@ -11,7 +11,7 @@ import {beforeEach, afterEach, describe, it, expect, vi} from 'vitest'
 import {createPinia, setActivePinia} from 'pinia'
 import {createMemoryHistory, createRouter} from 'vue-router'
 import {mount} from '@vue/test-utils'
-import {nextTick, ref} from 'vue'
+import {defineComponent, h, KeepAlive, nextTick, ref} from 'vue'
 
 setActivePinia(createPinia())
 
@@ -54,6 +54,7 @@ const MailWorkspace = (await import('./MailWorkspace.vue')).default
 const {useMailPrefs} = await import('@/composables/useMailPrefs.js')
 const {useUserStore} = await import('@/store/user.js')
 const {useEmailStore} = await import('@/store/email.js')
+const {useMailActions} = await import('@/composables/useMailActions.js')
 
 const mail = (emailId, extra = {}) => ({
     emailId,
@@ -96,13 +97,21 @@ afterEach(() => {
     wrapper = null
 })
 
-async function mountWorkspace(props = {}, {startAt = '/mail/inbox'} = {}) {
+/**
+ * `pattern` 可以换成没有 `:emailId?` 段的路径：`/mail/sent` 在生产里就是这个形状
+ * （`perm.js` 只给收件箱一类的路由补了可选段），深链 watch 的分裂就是为它写的。
+ */
+function makeRouter(pattern, startAt) {
     router = createRouter({
         history: createMemoryHistory(),
-        routes: [{path: '/mail/inbox/:emailId?', name: 'email', component: {template: '<div />'}, meta: {mail: true}}],
+        routes: [{path: pattern, name: 'email', component: {template: '<div />'}, meta: {mail: true}}],
     })
     router.push(startAt)
-    await router.isReady()
+    return router.isReady()
+}
+
+async function mountWorkspace(props = {}, {startAt = '/mail/inbox', pattern = '/mail/inbox/:emailId?'} = {}) {
+    await makeRouter(pattern, startAt)
 
     wrapper = mount(MailWorkspace, {
         props: {fetch: () => Promise.resolve({list: [mail(10), mail(9), mail(8)], total: 3}), ...props},
@@ -114,7 +123,43 @@ async function mountWorkspace(props = {}, {startAt = '/mail/inbox'} = {}) {
     return wrapper
 }
 
+/**
+ * 两个 workspace 塞进同一个 `<KeepAlive>`，靠 `key` 切换 —— 这就是 `layout/main` 的形状
+ * （`:key="route.name"` + keep-alive）。切走的那一个不卸载，只 deactivate。
+ */
+async function mountKeepAlivePair(propsA, propsB, {startAt = '/mail/inbox'} = {}) {
+    await makeRouter('/mail/inbox/:emailId?', startAt)
+
+    const which = ref('a')
+    const Host = defineComponent({
+        setup() {
+            return () => h(KeepAlive, null, {
+                default: () => h(MailWorkspace, {key: which.value, ...(which.value === 'a' ? propsA : propsB)}),
+            })
+        },
+    })
+
+    wrapper = mount(Host, {global: {plugins: [router]}, attachTo: document.body})
+    await new Promise((resolve) => setTimeout(resolve, 350))
+    await nextTick()
+
+    return {
+        async switchTo(next) {
+            which.value = next
+            await nextTick()
+            await new Promise((resolve) => setTimeout(resolve, 350))
+            await nextTick()
+        },
+    }
+}
+
 const rows = () => wrapper.findAll('[role="option"]')
+
+/** 勾第一行（命令条的动作作用于勾选集合） */
+const checkFirstRow = async () => {
+    await rows()[0].find('button[role="checkbox"]').trigger('click')
+    await nextTick()
+}
 
 /** `router.replace` 要跨过一个宏任务才落地（memory history 也一样），别只 await nextTick */
 const flush = async () => {
@@ -255,5 +300,205 @@ describe('MailWorkspace · 动作的连带影响', () => {
         await flush()
         expect(wrapper.text()).not.toContain('mail.noSelection')
         expect(wrapper.findAll('button').some((b) => b.attributes('aria-label') === 'mail.reply')).toBe(false)
+    })
+})
+
+/**
+ * 审计 P2-3：命令条的 handler 必须跟着「当前可见的那个 workspace」走。
+ *
+ * 四个邮件视图常驻 keep-alive，`onUnmounted` 永不触发。只在 setup 里注册一次的话，
+ * `useMailActions` 的 handlers 会永远指向**最后挂载过**的那一个 —— 在收件箱勾几封再点命令条的
+ * 删除，执行的是回收站那份（`trashMode` → 彻底删除），删掉的是别人。
+ */
+describe('MailWorkspace · 命令条归属（审计 P2-3）', () => {
+
+    it('切走再切回：动作落在当前可见的 workspace 上，而不是最后挂载的那个', async () => {
+        const delA = vi.fn(() => Promise.resolve())
+        const delB = vi.fn(() => Promise.resolve())
+        const {switchTo} = await mountKeepAlivePair(
+            {fetch: () => Promise.resolve({list: [mail(10), mail(9)], total: 2}), onDelete: delA},
+            {fetch: () => Promise.resolve({list: [mail(20)], total: 1}), onDelete: delB},
+        )
+        const {run} = useMailActions()
+
+        await checkFirstRow()
+        run('delete')
+        await flush()
+        expect(delA).toHaveBeenCalledWith([10])
+        expect(delB).not.toHaveBeenCalled()
+
+        // B 挂载 → 它接管；A 只是 deactivate，它的 release 不该把 B 的注册清掉
+        await switchTo('b')
+        await checkFirstRow()
+        run('delete')
+        await flush()
+        expect(delB).toHaveBeenCalledWith([20])
+        expect(delA).toHaveBeenCalledTimes(1)
+
+        // 回到 A：onActivated 重新接管（旧实现里这一步之后仍然是 B 的 handler）
+        await switchTo('a')
+        await checkFirstRow()
+        run('delete')
+        await flush()
+        expect(delA).toHaveBeenCalledTimes(2)
+        expect(delA).toHaveBeenLastCalledWith([9])
+        expect(delB).toHaveBeenCalledTimes(1)
+    })
+
+    it('切走时命令条的选中数归零，不留上一个列表的数字', async () => {
+        const {switchTo} = await mountKeepAlivePair(
+            {fetch: () => Promise.resolve({list: [mail(10), mail(9)], total: 2})},
+            {fetch: () => Promise.resolve({list: [mail(20)], total: 1})},
+        )
+        const {count} = useMailActions()
+
+        await checkFirstRow()
+        expect(count.value).toBe(1)
+
+        await switchTo('b')
+        expect(count.value).toBe(0)
+
+        await checkFirstRow()
+        expect(count.value).toBe(1)
+    })
+
+    it('一封都没勾、窗格也没打开时，命令条的删除什么都不做', async () => {
+        const onDelete = vi.fn(() => Promise.resolve())
+        await mountWorkspace({onDelete})
+
+        useMailActions().run('delete')
+        await flush()
+        expect(onDelete).not.toHaveBeenCalled()
+    })
+
+    it('回收站里没有目标时也不发彻底删除（P1-2：空 id 曾经等于清空整个回收站）', async () => {
+        const onPurge = vi.fn(() => Promise.resolve())
+        await mountWorkspace({trashMode: true, showUnread: false, showStar: false, onPurge})
+
+        useMailActions().run('delete')
+        await flush()
+        expect(onPurge).not.toHaveBeenCalled()
+    })
+
+    it('没勾选时命令条的删除作用于窗格里正在读的那一封', async () => {
+        const onDelete = vi.fn(() => Promise.resolve())
+        await mountWorkspace({onDelete})
+        await rows()[0].trigger('click')
+        await flush()
+
+        useMailActions().run('delete')
+        await flush()
+        expect(onDelete).toHaveBeenCalledWith([10])
+    })
+})
+
+/**
+ * 审计 P2-7 的连带：深链 watch 必须是两条 watch 而不是一个数组 watch。
+ *
+ * 合成一条时，`listRef.mails.length` 变化会带着 `id === undefined` 触发回调、命中
+ * `active.value = null`，正在读的邮件因为「列表多了一页」自己关掉。
+ * `/mail/sent` 这类没有 `:emailId?` 段的路由每翻一页都会踩到。
+ */
+describe('MailWorkspace · 深链 watch 的分裂（审计 P2-7）', () => {
+
+    it('路由没有 :emailId? 段时，列表变长不会关掉正在读的那一封', async () => {
+        await mountWorkspace({}, {startAt: '/mail/sent', pattern: '/mail/sent'})
+        await rows()[0].trigger('click')
+        await flush()
+        expect(wrapper.text()).not.toContain('mail.noSelection')
+
+        wrapper.vm.addItem(mail(11))
+        await flush()
+        expect(wrapper.text()).not.toContain('mail.noSelection')
+        expect(wrapper.text()).toContain('主题 10')
+    })
+
+    it('深链指向的邮件晚一步才进列表：列表变长之后仍然认得它', async () => {
+        await mountWorkspace(
+            {fetch: () => Promise.resolve({list: [mail(10)], total: 2})},
+            {startAt: '/mail/inbox/9'},
+        )
+        expect(wrapper.text()).toContain('mail.noSelection')
+
+        wrapper.vm.addItem(mail(9))
+        await flush()
+        expect(wrapper.text()).not.toContain('mail.noSelection')
+        expect(wrapper.text()).toContain('主题 9')
+    })
+
+    it('URL 上的 id 被清掉（点返回 / 前进后退）才关窗格', async () => {
+        await mountWorkspace({}, {startAt: '/mail/inbox/9'})
+        expect(wrapper.text()).toContain('主题 9')
+
+        await router.replace({name: 'email', params: {}})
+        await flush()
+        expect(wrapper.text()).toContain('mail.noSelection')
+    })
+})
+
+/**
+ * §7.5 的搜索：`?q=` 由 `MailWorkspace` 解析，条件作为**第三个参数**交给视图的 fetch。
+ *
+ * 这四个视图各自只多一行「把它转给自己的请求函数」，所以「解析、重新取数、Chip、
+ * 空结果文案」这些形状一致的部分只在这一层测。
+ */
+describe('MailWorkspace · 搜索（§7.5）', () => {
+
+    const okFetch = () => vi.fn(() => Promise.resolve({list: [mail(10), mail(9)], total: 2}))
+
+    it('把 ?q= 解析出的条件作为第三个参数传给 fetch', async () => {
+        const fetch = okFetch()
+        await mountWorkspace({fetch}, {startAt: '/mail/inbox?q=from%3Aboss%20%E5%8F%91%E7%A5%A8'})
+
+        expect(fetch).toHaveBeenCalled()
+        expect(fetch.mock.calls[0][2]).toEqual({from: 'boss', keyword: '发票'})
+    })
+
+    it('没在搜时第三个参数是空对象（请求与从前逐字节等价）', async () => {
+        const fetch = okFetch()
+        await mountWorkspace({fetch})
+        expect(fetch.mock.calls[0][2]).toEqual({})
+    })
+
+    it('条件变了重新从头取数，而不是接在旧结果后面翻页', async () => {
+        const fetch = okFetch()
+        await mountWorkspace({fetch})
+        const before = fetch.mock.calls.length
+
+        await router.replace({path: '/mail/inbox', query: {q: 'has:att'}})
+        await flush()
+        await new Promise((resolve) => setTimeout(resolve, 350))
+
+        expect(fetch.mock.calls.length).toBeGreaterThan(before)
+        const last = fetch.mock.calls.at(-1)
+        expect(last[2]).toEqual({hasAtt: 1})
+        // 从头拉 = 游标归 0（`useMailList.load()` 的 refresh 分支）
+        expect(last[0]).toBe(0)
+    })
+
+    it('搜索态在列表头部显示 Chip，点它清掉 ?q= 并重新取数', async () => {
+        const fetch = okFetch()
+        await mountWorkspace({fetch}, {startAt: '/mail/inbox?q=%E5%8F%91%E7%A5%A8'})
+
+        const chip = wrapper.findAll('button').find((b) => b.attributes('aria-label') === 'mail.clearSearch')
+        expect(chip?.text()).toContain('发票')
+
+        await chip.trigger('click')
+        await flush()
+        await new Promise((resolve) => setTimeout(resolve, 350))
+
+        expect(router.currentRoute.value.query.q).toBeUndefined()
+        expect(fetch.mock.calls.at(-1)[2]).toEqual({})
+        expect(wrapper.findAll('button').some((b) => b.attributes('aria-label') === 'mail.clearSearch')).toBe(false)
+    })
+
+    it('搜不到东西时说「没有匹配」，不说「这里还没有邮件」', async () => {
+        const fetch = vi.fn(() => Promise.resolve({list: [], total: 0}))
+        await mountWorkspace(
+            {fetch, emptyTitle: 'mail.emptyInbox'},
+            {startAt: '/mail/inbox?q=zzz'},
+        )
+        expect(wrapper.text()).toContain('mail.emptySearch')
+        expect(wrapper.text()).not.toContain('mail.emptyInbox')
     })
 })

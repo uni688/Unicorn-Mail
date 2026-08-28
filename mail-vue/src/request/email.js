@@ -1,7 +1,12 @@
 import http from '@/axios/index.js';
 
-export function emailList(accountId, allReceive, emailId, timeSort, size, type) {
-    return http.get('/email/list', {params: {accountId, allReceive, emailId, timeSort, size, type}})
+/**
+ * 邮件列表。`search` 是 `useSearchQuery().listParams`（`?q=` 解析出的过滤条件），
+ * 展开在同一层 query 上 —— 后端 `/email/list` 收的是 `c.req.query()` 整包，
+ * 多几个键不需要改路由，没搜时它是 `{}`，请求与从前一模一样。
+ */
+export function emailList(accountId, allReceive, emailId, timeSort, size, type, search = {}) {
+    return http.get('/email/list', {params: {accountId, allReceive, emailId, timeSort, size, type, ...search}})
 }
 
 export function emailDelete(emailIds) {
@@ -41,9 +46,9 @@ export function emailCounts(params) {
     return http.get('/email/counts', {params, noMsg: true})
 }
 
-/** 回收站列表。游标分页与 /email/list 同构（emailId 为上一页最后一条的 id） */
-export function emailTrashList(accountId, allReceive, emailId, size, type) {
-    return http.get('/email/trash', {params: {accountId, allReceive, emailId, size, type}})
+/** 回收站列表。游标分页与 /email/list 同构（emailId 为上一页最后一条的 id）；`search` 同上 */
+export function emailTrashList(accountId, allReceive, emailId, size, type, search = {}) {
+    return http.get('/email/trash', {params: {accountId, allReceive, emailId, size, type, ...search}})
 }
 
 /** 回收站还原（逻辑删除回滚），也是删除 Toast 里「撤销」按钮走的接口 */

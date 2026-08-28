@@ -34,12 +34,12 @@ const workspace = ref(null)
 const confirmOpen = ref(false)
 const purging = ref(false)
 
-function fetchList(cursor, size) {
+function fetchList(cursor, size, filters = {}) {
     const accountId = accountStore.currentAccountId
     const allReceive = accountStore.currentAccount?.allReceive
     // **不传 type**：删掉的已发送邮件同样在回收站里（后端 `trashList` 与 `counts.trash`
     // 都不按 type 过滤）。传 0 会让列表比侧栏角标少几封 —— §10.5 要求两者必须一致。
-    return emailTrashList(accountId, allReceive, cursor, size)
+    return emailTrashList(accountId, allReceive, cursor, size, undefined, filters)
 }
 
 /**

@@ -50,6 +50,11 @@ const starService = {
 			emailId = 9999999999;
 		}
 
+		// 星标视图也是 `MailWorkspace` 的四个邮件视图之一，`?q=` 必须在这里同样生效。
+		// 谓词由 `emailService.searchConditions` 提供（同一份转义与字段口径），
+		// 这里只是把它接进既有的 where —— 没搜时是空数组，查询与从前逐字节等价。
+		const search = emailService.searchConditions(params, userId);
+
 		const list = await orm(c).select({
 			isStar: sql`1`.as('isStar'),
 			starId: star.starId
@@ -60,7 +65,8 @@ const starService = {
 				and(
 					eq(star.userId, userId),
 					eq(email.isDel, isDel.NORMAL),
-					lt(star.emailId, emailId)))
+					lt(star.emailId, emailId),
+					...search))
 			.orderBy(desc(star.emailId))
 			.limit(size)
 			.all();

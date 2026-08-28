@@ -10,12 +10,15 @@
 
 ## 结论
 
-**NEED FIX**
+**NEED FIX**（审计当天）→ **已全部修复并复验**（2026-08-28，见下方「修复状态」）
 
-不建议上线。存在 1 个「两次点击即可复现」的 P0 功能性崩溃，以及 2 个会**永久丢失用户邮件**的 P1
-数据安全缺陷。P0 与 P1-1/P1-2 修完后可以再评估。
+审计当天不建议上线：存在 1 个「两次点击即可复现」的 P0 功能性崩溃，以及 2 个会**永久丢失用户邮件**
+的 P1 数据安全缺陷。P0 与 P1-1/P1-2 修完后可以再评估。
 
 P0/P1 全部经真实浏览器与真实 worker 验证，非静态推断。
+
+16 项现已在 `fix/audit-p0-p3-2026-08-22` 上修完，并补了 worker 服务层与前端两侧的自动化用例
+（82 文件 / 1481 用例全绿）+ 一轮浏览器过审。范围内的缺陷不再阻塞上线；仍未覆盖的部分见文末。
 
 ### 严重级别口径
 
@@ -45,6 +48,29 @@ P0/P1 全部经真实浏览器与真实 worker 验证，非静态推断。
 | P2-7 | P2 | `perm.js:91` | `/mail/sent` 缺 `:emailId?`，深链静默丢弃 | 路由表 |
 | P3-1 | P3 | `email-service.js:549` | 站内投递收件人精确匹配，大小写不符即黑洞 | 代码 |
 | P3-2 | P3 | `email-service.js:253` | 回复引用的邮件不校验归属 | 代码 |
+
+### 修复状态（2026-08-27，分支 `fix/audit-p0-p3-2026-08-22`）
+
+16 项全部已修。每项的具体修法见下文各章的「修复」段，这里只记落在哪个提交里。
+
+| # | 状态 | 提交 |
+|---|---|---|
+| P0-1 | 已修 | `7de025d`（服务端聚合）+ `8e053fe`（前端不再传 `accountId=0` 之外的空值） |
+| P1-1 | 已修 | `7de025d` |
+| P1-2 | 已修 | `7de025d`（`all=1` 显式入口）+ `8e053fe`（请求层不再发空 id） |
+| P1-3 | 已修 | `5325d35` |
+| P1-4 | 已修 | `5325d35` |
+| P1-5 | 已修 | `7de025d` |
+| P2-1 | 已修 | `7de025d` |
+| P2-2 | 已修 | `7de025d` |
+| P2-3 | 已修 | `5325d35` |
+| P2-4 | 已修 | `7de025d` |
+| P2-5 | 已修 | `8e053fe` |
+| P2-6 | 已修 | `8e053fe` |
+| P2-7 | 已修 | `8e053fe` |
+| P3-1 | 已修 | `7de025d` |
+| P3-2 | 已修 | `7de025d` |
+| 人工审计「邮件行与文档设计不符」 | 已修 | `5325d35` |
 
 ---
 
@@ -617,13 +643,73 @@ onDeactivated(() => unregisterMailActions())
 - **控制台错误**：整轮交互（切邮箱、四个文件夹、打开阅读窗格、写信提交）无 console error /
   未捕获拒绝。
 
+## 补做的验证（2026-08-27）
+
+审计当天「未覆盖的范围」里有两条是方法缺口而不是范围取舍，本轮补上：
+
+**一、`useSearchQuery.js` 无生产调用方 → 已接线（§7.5 服务端过滤）**
+
+- `email-service.js` 新增模块级 `searchConditions(params, userId)`，被 `list()`（列表 + `total`
+  两条查询）、`trashList()` 与 `starService.list()` 共用：同一份字段口径、同一份通配符转义
+  （`COLLATE NOCASE LIKE … ESCAPE '\'`），`hasAtt` / `star` 用 EXISTS 半连接，
+  两个附件不会让同一封出现两行。
+- `list()` 的 `latestEmailQuery` **刻意不过滤**：它是长轮询的游标（全局最新一封的 id），
+  收窄会让轮询从一个偏小的 id 起反复拉回同一批。代价由前端补：收件箱长轮询用
+  `matchesQuery()` 把新邮件过一遍同一套条件，搜索态下不会插进一封不符合条件的行。
+- 前端：`MailWorkspace` 持有 `useSearchQuery()`，把条件作为**第三个参数**交给视图的
+  `fetch`；四个视图各多一行转发。`MailList` 多一个 `searchText` prop（兼作「搜索态」标记与
+  重新取数的触发器）+ 头部搜索 Chip + 「没有匹配」的空状态。命令面板补上 §6.2 的「邮件」组
+  （一条「搜索邮件：<词>」，带着 `?q=` 进当前邮件视图）。
+- 前端用例：`MailWorkspace.spec.js` 增「搜索（§7.5）」一节（第三个参数、条件变更从头取数、
+  Chip 清词、「没有匹配」文案）；新增 `useCommandPalette.mail.spec.js` —— 「邮件」组只在
+  `all` 模式 + 有词 + `email` 路由存在时出现，点它在邮件视图里原地加 `?q=` 并清掉 `:emailId`，
+  在其它页面回收件箱，其余 query 参数保留。
+
+**二、worker 侧零自动化覆盖 → 补了服务层用例**
+
+跑在真 SQLite 上（`node:sqlite` + D1 形状的 shim，表结构由**真的**迁移链 `dbInit.init(c)` 建），
+因为被测行为本身就是 SQL 行为（负 `LIMIT` = 无限制、`COLLATE NOCASE`、`LIKE … ESCAPE`、
+`datetime('now', ?)`、`del_time IS NULL` 回填、leftJoin 的 `account.is_del` 可见性）：
+
+- `mail-worker/test/page-utils.node.spec.js`（P2-1 的分页收口）
+- `mail-worker/test/email-service.node.spec.js`（P0-1 / P1-1 / P1-2 / P1-5 / P2-2 / P2-4，
+  以及本轮新增的搜索条件与 `trashList` 搜索）
+- `mail-worker/test/account-service.node.spec.js`（`searchByKeyword` 的排序 / 转义 / 收口）
+- `mail-worker/test/star-service.node.spec.js`（星标视图与另外三个视图同源）
+- 入口：`mail-vue/vitest.config.js` 里新增 `worker` project（`environment: 'node'`，
+  `root: ../mail-worker`，`include: test/**/*.node.spec.js`）。
+  `@cloudflare/vitest-pool-workers` 在本机起不来（vitest 跑在 workerd 里要 `node:vm`，
+  报 `MiniflareCoreError [ERR_RUNTIME_FAILURE]`），所以走 node + 真 SQLite 这条替代路径。
+
+**三、两个 project 一起跑的结果（2026-08-28）**
+
+`pnpm vitest run`（`web` + `worker`）：82 文件 / 1481 用例全绿。
+`email-service.node.spec.js` 里 stderr 打的「跳过字段：no such column: auto_refresh_time」
+是 shim 刻意的行为 —— fixture 只建迁移链里的列，`setting` 的新列不参与被测逻辑。
+
+## 浏览器过审（2026-08-28）
+
+`wrangler dev` 8787 + `vite dev` 3001 + 本地 D1 fixture，全程无 console error / 未捕获拒绝。
+DOM 侧的数值都是量出来的（`getComputedStyle` / `getBoundingClientRect`），不是看图判断：
+
+| 项 | 期望（文档） | 实测 |
+|---|---|---|
+| 密度三档行高 | §7.4 紧凑 44 / 标准 56 / 宽松 72 | 44 / 56 / 72，`aria-pressed` 跟着切，`um-mail-prefs` 落盘 |
+| 未读态 | §5.3.3 6px 圆点 + 字重，不改底色 | 圆点 5.99px `--accent`，发件人与主题 550，背景 `rgba(0,0,0,0)` |
+| 已读行 | 同上取反 | 无圆点、字重 400、背景同样透明 |
+| 搜索 `?q=` | §7.5 服务端过滤 | `?q=Security` → `GET /email/list?…&keyword=Security`，12 行全部命中，Chip 显示原词、`aria-label`「清除搜索条件」 |
+| 列表键盘作用域 | §7.1 ↑/↓ · x · Shift+↑/↓ · a · Esc | 依次得到 0 → 1 → 2 → 12（表头三态 checked）→ 0 |
+| 回收站 | P1-1 / P1-2 | `DELETE /email/delete` → `PUT /email/restore` → `/email/counts` 三条都 200，角标与列表同步 |
+
+`/email/counts` 返回 `{inbox:82, unread:18, star:7, code:16, trash:4, sent:6}`，与侧栏角标逐项一致
+（P0-1 当时的症状正是这里对不上）。
+
 ## 未覆盖的范围
 
-- `useSearchQuery.js` 无生产调用方，其 `toListParams()` 产出的
-  `keyword/from/to/subject/hasAtt` 后端 `/email/list` 目前并不接受（§10.5 列为待新增参数）。
-  按现状接线会返回未过滤结果。
 - 真实 Resend 外发链路（本地无 key，仅覆盖到站内投递分支）。
 - 附件上传 / R2 往返。
 - 管理端 `views/all-email`、`views/draft` 仍用旧 `email-scroll`，未在本次 P3 范围内。
-- 未执行 `pnpm vitest run`（受 C: 盘空间限制，需先把 `TEMP`/`TMP` 指到 `D:\tmp-build`）。
+- `?q=` 里的 `in:` 只解析、不分流：在收件箱里搜 `in:trash` 搜的还是收件箱
+  （`toListParams()` 刻意不产出 folder）。要么让入口按 folder 换路由，要么把这个语法糖从 §7.5 删掉。
+- 附录 C 的安全工作项（按既定顺序冻结到 UI 收尾之后）。
 

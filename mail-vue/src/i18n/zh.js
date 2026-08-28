@@ -408,6 +408,9 @@ const zh = {
         paletteEmpty: '没有匹配的命令',
         groupRecent: '最近访问',
         groupActions: '动作',
+        /* 邮件分栏只在输入了关键词时出现（§6.2 「邮件」组），排在「转到」之前 */
+        groupMail: '邮件',
+        searchMail: '搜索邮件：{term}',
         groupGoto: '转到',
         groupSettings: '设置',
         groupMailboxes: '邮箱',
@@ -507,6 +510,11 @@ const zh = {
         emptyStarHint: '在列表里点邮件左边的星星就会出现在这里',
         emptySent: '还没有发过邮件',
         emptySentHint: '发出去的邮件会留在这里',
+        /* 搜索态（§7.5）：空结果要说「没有匹配」而不是「这里还没有邮件」，
+           后者会让人以为邮箱被清空了 */
+        emptySearch: '没有匹配的邮件',
+        emptySearchHint: '换个关键词，或清掉搜索条件看全部',
+        clearSearch: '清除搜索条件',
         saveDraft: '存草稿',
         draftSaved: '草稿已保存',
         discardDraft: '不保存，直接丢弃',

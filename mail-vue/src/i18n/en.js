@@ -404,6 +404,9 @@ const en = {
         paletteEmpty: 'No matching command',
         groupRecent: 'Recent',
         groupActions: 'Actions',
+        /* The mail section only appears once a term is typed (§6.2), above "Go to" */
+        groupMail: 'Mail',
+        searchMail: 'Search mail: {term}',
         groupGoto: 'Go to',
         groupSettings: 'Settings',
         groupMailboxes: 'Mailboxes',
@@ -503,6 +506,11 @@ const en = {
         emptyStarHint: 'Star a message in the list and it shows up here',
         emptySent: 'Nothing sent yet',
         emptySentHint: 'Messages you send stay here',
+        /* Search state (§7.5): an empty result must read as "no matches", not as
+           "no mail here" — the latter suggests the mailbox itself was emptied */
+        emptySearch: 'No matching messages',
+        emptySearchHint: 'Try another term, or clear the search to see everything',
+        clearSearch: 'Clear search',
         saveDraft: 'Save draft',
         draftSaved: 'Draft saved',
         discardDraft: 'Discard without saving',

@@ -20,8 +20,22 @@ vi.mock('vue-i18n', async (importOriginal) => ({
     useI18n: () => ({t: (key, params) => (params ? `${key}:${JSON.stringify(params)}` : key), locale: ref('zh')}),
 }))
 
+/**
+ * 剪贴板要换掉：`useClipboard({legacy: true})` 的兜底路径走 `document.execCommand`，
+ * jsdom 根本没有这个方法，真调会在点击处理里同步抛出。
+ */
+const copy = vi.fn(() => Promise.resolve())
+
+vi.mock('@vueuse/core', async (importOriginal) => ({
+    ...(await importOriginal()),
+    useClipboard: () => ({copy: (...args) => copy(...args), copied: ref(false), isSupported: ref(true)}),
+}))
+
 const MailList = (await import('./MailList.vue')).default
+const MailRow = (await import('./MailRow.vue')).default
 const {useMailPrefs} = await import('@/composables/useMailPrefs.js')
+const {useAccountStore} = await import('@/store/account.js')
+const {toast} = await import('@/components/ui/Toast/toast.js')
 
 const mail = (emailId) => ({
     emailId,
@@ -49,6 +63,7 @@ beforeEach(() => {
     localStorage.clear()
     setActivePinia(createPinia())
     useMailPrefs().resetPrefs()
+    copy.mockClear()
     Object.defineProperty(HTMLElement.prototype, 'offsetHeight', {
         configurable: true,
         get() {
@@ -222,5 +237,114 @@ describe('MailList · 键盘与密度', () => {
         expect(fetch).toHaveBeenCalledTimes(2)
         expect(wrapper.vm.selection.count.value).toBe(0)
         expect(wrapper.emitted('refresh')).toHaveLength(1)
+    })
+})
+
+/**
+ * 审计 P1-3：切邮箱必须重新拉列表。
+ *
+ * `layout/main` 是 keep-alive + `:key="route.name"`，切邮箱既不换 key 也不重挂组件，
+ * `select()` 在邮件路由上又刻意跳过导航 —— 没有这条 watch，列表会一直停在上一个邮箱的数据上，
+ * 再翻一页还会把新邮箱的行追加在旧邮箱后面（游标取自 `mails.at(-1).emailId`）。
+ */
+describe('MailList · 切邮箱重取（审计 P1-3）', () => {
+
+    it('切邮箱重新取数，并清掉上一个邮箱的选中与光标', async () => {
+        const fetch = vi.fn(() => Promise.resolve(page(10, 4, 4)))
+        await mountList({fetch})
+
+        await rows()[0].find('button[role="checkbox"]').trigger('click')
+        await wrapper.find('[role="listbox"]').trigger('keydown', {key: 'ArrowDown'})
+        expect(wrapper.vm.selection.count.value).toBe(1)
+
+        useAccountStore().currentAccountId = 7
+        await nextTick()
+        await new Promise((resolve) => setTimeout(resolve, 350))
+
+        expect(fetch).toHaveBeenCalledTimes(2)
+        expect(wrapper.vm.selection.count.value).toBe(0)
+        expect(wrapper.emitted('refresh')).toHaveLength(1)
+    })
+
+    it('新邮箱的行替换旧邮箱的行，而不是追加在后面', async () => {
+        let batch = 0
+        const fetch = vi.fn(() => Promise.resolve(batch++ === 0 ? page(20, 3, 3) : page(10, 2, 2)))
+        await mountList({fetch})
+        expect(rows()).toHaveLength(3)
+
+        useAccountStore().currentAccountId = 7
+        await nextTick()
+        await new Promise((resolve) => setTimeout(resolve, 350))
+
+        expect(wrapper.vm.mails.map((m) => m.emailId)).toEqual([10, 9])
+    })
+
+    it('回到「全部邮箱」（accountId 0）同样重取', async () => {
+        const fetch = vi.fn(() => Promise.resolve(page(10, 4, 4)))
+        useAccountStore().currentAccountId = 7
+        await mountList({fetch})
+
+        useAccountStore().currentAccountId = 0
+        await nextTick()
+        await new Promise((resolve) => setTimeout(resolve, 350))
+
+        expect(fetch).toHaveBeenCalledTimes(2)
+    })
+
+    it('切时间排序也走本地 refresh：清选中而不是只换数据', async () => {
+        const fetch = vi.fn(() => Promise.resolve(page(10, 4, 4)))
+        await mountList({fetch})
+        await rows()[0].find('button[role="checkbox"]').trigger('click')
+
+        useMailPrefs().setTimeSort(1)
+        await nextTick()
+        await new Promise((resolve) => setTimeout(resolve, 350))
+
+        expect(fetch).toHaveBeenCalledTimes(2)
+        expect(wrapper.vm.selection.count.value).toBe(0)
+    })
+})
+
+describe('MailList · 聚合态与验证码（§5.3.3）', () => {
+
+    it('「全部邮箱」时给行开 showMailbox，选了具体邮箱就关掉', async () => {
+        await mountList({fetch: () => Promise.resolve(page(10, 2, 2))})
+        expect(wrapper.findComponent(MailRow).props('showMailbox')).toBe(true)
+
+        useAccountStore().currentAccountId = 7
+        await nextTick()
+        await new Promise((resolve) => setTimeout(resolve, 350))
+
+        expect(wrapper.findComponent(MailRow).props('showMailbox')).toBe(false)
+    })
+
+    it('摘要只在舒适档出现：紧凑 / 适中都不传 showPreview', async () => {
+        await mountList({fetch: () => Promise.resolve(page(10, 2, 2))})
+        const showPreview = () => wrapper.findComponent(MailRow).props('showPreview')
+
+        expect(showPreview()).toBe(false) // 默认 cozy(56)：放不下三行
+        useMailPrefs().setDensity('roomy')
+        await nextTick()
+        expect(showPreview()).toBe(true)
+        useMailPrefs().setDensity('compact')
+        await nextTick()
+        expect(showPreview()).toBe(false)
+    })
+
+    it('点验证码 Badge：复制并给 Toast 回执（复制没有视觉结果，必须有回执）', async () => {
+        const success = vi.spyOn(toast, 'success')
+        const withCode = () => ({list: [{...mail(10), code: '812394'}], total: 1})
+        await mountList({fetch: () => Promise.resolve(withCode())})
+
+        const chip = wrapper.findAll('button').find((b) => b.text().includes('812394'))
+        expect(chip).toBeTruthy()
+        await chip.trigger('click')
+        await nextTick()
+
+        expect(copy).toHaveBeenCalledWith('812394')
+        expect(success).toHaveBeenCalledWith('copySuccessMsg')
+        // 点验证码不连带打开邮件
+        expect(wrapper.emitted('open')).toBeUndefined()
+        success.mockRestore()
     })
 })

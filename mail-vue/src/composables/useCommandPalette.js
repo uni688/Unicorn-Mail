@@ -14,8 +14,8 @@
  * 本身全站只挂一份。数据源得用 `useCommandPalette()` 在组件里取，因为它要 router、
  * store 和 i18n。
  *
- * 分组顺序固定「动作 → 转到 → 邮件 → 设置」（§6.2）。「邮件搜索结果」要等 P3 的
- * `MailList` 与搜索解析器，这里**不占位** —— 摆一个永远空的分组比没有更糟。
+ * 分组顺序固定「动作 → 转到 → 邮件 → 设置」（§6.2）。「邮件」这一组不是搜索结果列表，
+ * 而是一条通往搜索结果的路：输入了词才出现，点它带着 `?q=` 进邮件视图（见 `mailItems`）。
  *
  * 过滤是自实现 fuzzy（§6.2「自实现 fuzzy，无需额外依赖」）：子串命中给高分，否则退化为
  * 按序子序列匹配。中文只能走子串（拼音不在范围内），所以每个条目都带 `keywords`
@@ -33,6 +33,7 @@ import IconSend from '~icons/lucide/send'
 import IconFileText from '~icons/lucide/file-text'
 import IconStar from '~icons/lucide/star'
 import IconAtSign from '~icons/lucide/at-sign'
+import IconSearch from '~icons/lucide/search'
 import IconMails from '~icons/lucide/mails'
 import IconSettings from '~icons/lucide/settings'
 import IconSunMoon from '~icons/lucide/sun-moon'
@@ -343,6 +344,39 @@ export function useCommandPalette() {
 
     const gotoItems = computed(() => withRoute(GOTO, 'goto'))
 
+    /**
+     * 「邮件」组（§6.2 里「转到」与「设置」之间的那一格）。
+     *
+     * 面板**不预取邮件**：一次输入打一次 `/email/list` 太贵，而且面板里最多显示几行，
+     * 不如直接把人送进列表。所以这一组永远只有一条 ——「搜索邮件：<词>」，真正的过滤
+     * 由 `MailWorkspace`（读 `?q=`）+ 后端 `searchConditions()` 完成。
+     *
+     * 已经在邮件视图里（`meta.mail`）就原地加条件：在回收站里搜就搜回收站、在已发送里
+     * 搜就搜已发送；其它页面（设置、管理端）统一回收件箱。顺手把 `:emailId` 清掉 ——
+     * 换了筛选条件之后，窗格里那封很可能已经不在结果里了。
+     */
+    const mailItems = computed(() => {
+        const q = term.value.trim()
+        if (!q || !router.hasRoute('email')) return []
+        return [{
+            value: 'mail:search',
+            label: t('shell.searchMail', {term: q}),
+            icon: IconSearch,
+            run: () => {
+                const current = router.currentRoute.value
+                if (current.meta?.mail) {
+                    router.push({
+                        name: current.name,
+                        params: {...current.params, emailId: undefined},
+                        query: {...current.query, q},
+                    })
+                } else {
+                    router.push({name: 'email', query: {q}})
+                }
+            },
+        }]
+    })
+
     const settingsItems = computed(() => [
         ...withRoute(SETTINGS, 'set'),
     ])
@@ -390,8 +424,8 @@ export function useCommandPalette() {
     })
 
     /**
-     * 分组顺序：最近（仅空输入）→ 动作 → 转到 → 设置 → 邮箱。
-     * §6.2 的「邮件搜索结果」插在「转到」与「设置」之间，等 P3 有数据了再加。
+     * 分组顺序：最近（仅空输入）→ 动作 → 转到 → 邮件 → 设置 → 邮箱（§6.2）。
+     * 「邮件」那一条不过 fuzzy —— 它的 label 就是用户刚打的词，再拿同一个词去筛毫无意义。
      */
     const groups = computed(() => {
         const q = term.value
@@ -419,6 +453,7 @@ export function useCommandPalette() {
         if (!q && recentItems.value.length) push(t('shell.groupRecent'), recentItems.value)
         push(t('shell.groupActions'), actions.value, q ? Infinity : 5)
         push(t('shell.groupGoto'), gotoItems.value)
+        if (mailItems.value.length) out.push({label: t('shell.groupMail'), options: mailItems.value})
         push(t('shell.groupSettings'), settingsItems.value)
         // `all` 模式下只用**已经拉到的**邮箱，避免为了一次搜索去打接口
         if (q && mailboxItems.value.length) push(t('shell.groupMailboxes'), mailboxItems.value, 6)

@@ -9,6 +9,7 @@
  * echarts），那属于浏览器里的人工过审，不是单测该扛的。
  */
 import {describe, expect, it} from 'vitest'
+import {createMemoryHistory, createRouter} from 'vue-router'
 import router from '@/router'
 import {permsToRouter} from '@/perm/perm.js'
 
@@ -34,6 +35,19 @@ describe('路由表 · 静态页（§5.2）', () => {
 
     it('未匹配的路径落 404 而不是白屏', () => {
         expect(router.resolve('/no-such-page').name).toBe('404')
+    })
+
+    /**
+     * 审计 P2-7：深链靠 path 里的 `:emailId?` 段。matcher 是**按 key 过滤 params** 的，
+     * 少了那一段，`router.replace({name, params: {emailId}})` 会静默把 emailId 丢掉 ——
+     * 点开一封邮件 URL 不变，刷新回到列表。
+     */
+    it.each([
+        ['email', '/mail/inbox/9'],
+        ['star', '/mail/starred/9'],
+        ['trash', '/mail/trash/9'],
+    ])('%s 能深链到单封邮件（%s）', (name, path) => {
+        expect(router.resolve({name, params: {emailId: 9}}).path).toBe(path)
     })
 })
 
@@ -135,6 +149,13 @@ describe('permsToRouter · 权限页（§5.2「映射关系不变，只改目标
     it('没有权限就一个都不注入', () => {
         expect(permsToRouter([])).toEqual([])
         expect(permsToRouter(['email:query'])).toEqual([])
+    })
+
+    /** 注入进来的已发送也要能深链（P2-7 的另一半：静态四视图之外的那一个） */
+    it('已发送深链保留 emailId，缺省时仍然是列表页', () => {
+        const probe = createRouter({history: createMemoryHistory(), routes: pages})
+        expect(probe.resolve({name: 'send', params: {emailId: 9}}).path).toBe('/mail/sent/9')
+        expect(probe.resolve({name: 'send'}).path).toBe('/mail/sent')
     })
 
     it('按权限键分别注入，别名跟着它那一份权限走', () => {

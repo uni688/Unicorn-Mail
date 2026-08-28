@@ -74,7 +74,110 @@ async function syncDelTime(c, userId, emailIds, stamp) {
 	}
 }
 
+/**
+ * 搜索谓词（§7.5 / §10.5「`/email/list` 待新增的过滤参数」）。
+ *
+ * 参数名逐个对齐前端 `useSearchQuery.toListParams()`（`mail-vue/src/composables/useSearchQuery.js:154`），
+ * 那一侧是 `?q=` 的唯一解析器，两边对不上就是「搜了但没过滤」：
+ *
+ * | 入参 | 语义 |
+ * |---|---|
+ * | `keyword` | 全文：主题 / 发件地址 / 发件人名 / 收件地址 / 正文纯文本 |
+ * | `from` | 发件地址**或**发件人名（`matchesQuery` 的本地兜底也是这两个字段） |
+ * | `to` `subject` | 收件地址 / 主题 |
+ * | `hasAtt` `hasCode` | 有普通附件 / 有验证码 |
+ * | `star` | 自己星标过的 |
+ * | `unread` | **列值**（0 未读 / 1 已读，见 `entity-const.js` —— 名字和直觉相反），两侧都不取反 |
+ * | `startTime` `endTime` | `create_time` 闭区间，UTC 字符串，前端已按本地日历日转好 |
+ *
+ * 五件必须做对的事：
+ * 1. **参数化**。模式串一律走绑定参数，没有一处字符串拼接（附录 C 第 1 条就是拼出来的洞）。
+ * 2. **转义通配符**。用户打进来的 `%` `_` `\` 是字面量，转义后显式声明 `ESCAPE '\'`。
+ *    管理端 `allList()` 那几处老写法没转义 —— 在那里一个 `%` 等于「不过滤」，新代码不学它。
+ * 3. **`hasAtt` / `star` 用 EXISTS 而不是再 join 一次**。`list()` 已经 leftJoin 了 `star`
+ *    用来算 `isStar`，附件更是一对多：join 一封两个附件的邮件会变成两行，翻页游标随之错位。
+ *    半连接不改变行数，同一份谓词还能直接用在 `count()` 那条查询上。
+ * 4. **`star` 必须带 userId**。星标是「谁标的」，漏了就成了「任何人标过的」。
+ * 5. **空参数返回空数组**。没在搜的时候 `and(...[])` 不产生任何谓词，
+ *    `list()` / `trashList()` / `starService.list()` 与从前逐字节等价。
+ *
+ * 刻意**不**作用于 `list()` 的 `latestEmailQuery`：那一条是长轮询的游标（「全局最新一封的 id」），
+ * 按搜索条件缩小它，长轮询会从一个偏小的 id 起反复拉回同一批邮件。
+ */
+function searchConditions(params, userId) {
+
+	const { keyword, from, to, subject, hasAtt, hasCode, star: onlyStar, unread, startTime, endTime } = params ?? {};
+
+	const conditions = [];
+
+	/** `LIKE` 之前的净化：截到 64（与 `accountService.searchByKeyword` 同一个上限）+ 转义通配符 */
+	const term = (value) => {
+		const raw = String(value ?? '').trim();
+		if (!raw) return null;
+		return raw.substring(0, 64).replace(/[\\%_]/g, ch => `\\${ch}`);
+	};
+
+	const contains = (column, value) => sql`${column} COLLATE NOCASE LIKE ${'%' + value + '%'} ESCAPE '\\'`;
+
+	const keywordTerm = term(keyword);
+	if (keywordTerm) {
+		conditions.push(or(
+			contains(email.subject, keywordTerm),
+			contains(email.sendEmail, keywordTerm),
+			contains(email.name, keywordTerm),
+			contains(email.toEmail, keywordTerm),
+			contains(email.text, keywordTerm)
+		));
+	}
+
+	const fromTerm = term(from);
+	if (fromTerm) {
+		conditions.push(or(contains(email.sendEmail, fromTerm), contains(email.name, fromTerm)));
+	}
+
+	const toTerm = term(to);
+	if (toTerm) {
+		conditions.push(contains(email.toEmail, toTerm));
+	}
+
+	const subjectTerm = term(subject);
+	if (subjectTerm) {
+		conditions.push(contains(email.subject, subjectTerm));
+	}
+
+	if (Number(hasAtt) === 1) {
+		conditions.push(sql`EXISTS (SELECT 1 FROM attachments a WHERE a.email_id = ${email.emailId} AND a.type = ${attConst.type.ATT})`);
+	}
+
+	if (Number(hasCode) === 1) {
+		conditions.push(ne(email.code, ''));
+	}
+
+	if (Number(onlyStar) === 1) {
+		conditions.push(sql`EXISTS (SELECT 1 FROM star s WHERE s.email_id = ${email.emailId} AND s.user_id = ${userId})`);
+	}
+
+	// `unread` 只认 0 / 1；`''`（前端没勾这一项时的空 query 参数）与任何脏值都当没传
+	const unreadValue = Number(unread);
+	if (unread !== undefined && unread !== null && unread !== '' && (unreadValue === emailConst.unread.UNREAD || unreadValue === emailConst.unread.READ)) {
+		conditions.push(eq(email.unread, unreadValue));
+	}
+
+	if (startTime) {
+		conditions.push(gte(email.createTime, String(startTime)));
+	}
+
+	if (endTime) {
+		conditions.push(lte(email.createTime, String(endTime)));
+	}
+
+	return conditions;
+}
+
 const emailService = {
+
+	/** 暴露给 `starService.list()`：星标视图也是四个邮件视图之一，搜索语义必须同源 */
+	searchConditions,
 
 	async list(c, params, userId) {
 
@@ -96,6 +199,9 @@ const emailService = {
 		}
 
 		allReceive = await resolveAllReceive(c, accountId, allReceive);
+
+		// 顶栏 / ⌘K 的 `?q=` 过滤条件；没在搜时是空数组，谓词与从前一模一样
+		const search = searchConditions(params, userId);
 
 		const query = orm(c)
 			.select({
@@ -120,7 +226,8 @@ const emailService = {
 					timeSort ? gt(email.emailId, emailId) : lt(email.emailId, emailId),
 					eq(email.type, type),
 					eq(email.isDel, isDel.NORMAL),
-					eq(account.isDel, isDel.NORMAL)
+					eq(account.isDel, isDel.NORMAL),
+					...search
 				)
 			);
 
@@ -143,7 +250,8 @@ const emailService = {
 					eq(email.userId, userId),
 					eq(email.type, type),
 					eq(email.isDel, isDel.NORMAL),
-					eq(account.isDel, isDel.NORMAL)
+					eq(account.isDel, isDel.NORMAL),
+					...search
 				)
 		).get();
 
@@ -1179,12 +1287,15 @@ const emailService = {
 
 		allReceive = await resolveAllReceive(c, accountId, allReceive);
 
+		const search = searchConditions(params, userId);
+
 		const scope = (...extra) => and(
 			allReceive ? eq(1, 1) : eq(email.accountId, accountId),
 			eq(email.userId, userId),
 			eq(email.isDel, isDel.DELETE),
 			eq(account.isDel, isDel.NORMAL),
 			Number.isInteger(type) ? eq(email.type, type) : undefined,
+			...search,
 			...extra
 		);
 

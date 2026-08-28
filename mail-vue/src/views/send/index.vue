@@ -28,10 +28,10 @@ const {prefs} = useMailPrefs()
 
 const workspace = ref(null)
 
-function fetchList(cursor, size) {
+function fetchList(cursor, size, filters = {}) {
     const accountId = accountStore.currentAccountId
     const allReceive = accountStore.currentAccount?.allReceive
-    return emailList(accountId, allReceive, cursor, prefs.timeSort, size, 1)
+    return emailList(accountId, allReceive, cursor, prefs.timeSort, size, 1, filters)
 }
 
 function onStarCancel(email) {

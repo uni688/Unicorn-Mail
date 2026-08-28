@@ -33,6 +33,8 @@ import IconRefresh from '~icons/lucide/refresh-cw'
 import IconTrash from '~icons/lucide/trash-2'
 import IconMailOpen from '~icons/lucide/mail-open'
 import IconClock from '~icons/lucide/clock'
+import IconSearch from '~icons/lucide/search'
+import IconX from '~icons/lucide/x'
 import {Button, Checkbox, Skeleton, Tooltip} from '@/components/ui'
 import {toast} from '@/components/ui/Toast/toast.js'
 import {EmptyState, ErrorState} from '@/components/composite'
@@ -63,6 +65,15 @@ const props = defineProps({
     trashMode: {type: Boolean, default: false},
     /** 有没有删除权限（`email:delete`），没有就不画批量动作 */
     canDelete: {type: Boolean, default: true},
+    /**
+     * 当前的搜索文本（`?q=` 原文，由 `MailWorkspace` 从 `useSearchQuery()` 透传）。
+     *
+     * 两个作用，都不需要这一层知道语法：非空 = 「在搜索态」（画一枚可关闭的 Chip、
+     * 空列表换成「没有匹配的邮件」）；值一变就重新取数 —— 过滤条件在调用方的 `fetch`
+     * 里（`MailWorkspace` 会把 `listParams` 作为第三个参数传进去），这一层只负责
+     * 「条件变了要从头拉」，和 `prefs.timeSort` / `currentAccountId` 同一个道理。
+     */
+    searchText: {type: String, default: ''},
     emptyTitle: {type: String, default: ''},
     emptyDescription: {type: String, default: ''},
     class: {type: [String, Array, Object], default: undefined},
@@ -70,6 +81,7 @@ const props = defineProps({
 
 const emit = defineEmits([
     'open', 'delete', 'restore', 'purge', 'read', 'unread', 'star', 'unstar', 'refresh', 'contextmenu',
+    'clear-search',
 ])
 
 const {t} = useI18n()
@@ -105,6 +117,9 @@ const total = computed(() => list.total.value)
 const showEmpty = computed(() => !list.loading.value && !list.error.value && list.mails.length === 0)
 const showError = computed(() => !!list.error.value && list.mails.length === 0)
 
+/** 搜索态：空结果的文案要说「没有匹配」，而不是「这里还没有邮件」——后者会让人以为邮箱空了 */
+const searching = computed(() => !!props.searchText.trim())
+
 /**
  * 「全部邮箱」聚合态（`currentAccountId === 0`）：每行的时间左侧补一枚收件邮箱 Chip
  * （§5.3.3 v1.2）。单邮箱视图里那一列永远是同一个地址，是纯噪音，所以只在聚合态显示。
@@ -135,6 +150,14 @@ watch(() => prefs.timeSort, () => refresh())
  * 追加在旧邮箱的行后面（游标取自 `mails.at(-1).emailId`），两个邮箱的邮件混在同一张列表里。
  */
 watch(() => accountStore.currentAccountId, () => refresh())
+
+/**
+ * 改搜索条件 = 换了一批数据（§7.5「筛选态同步到 URL」）。
+ *
+ * 走的是同一个本地 `refresh()`：搜索结果里留着上一批的选中 id 和键盘光标，
+ * 批量删除会删到已经不在列表里的邮件。
+ */
+watch(() => props.searchText, () => refresh())
 
 function refresh() {
     selection.clear()
@@ -278,6 +301,19 @@ defineExpose({
         </Button>
       </Tooltip>
 
+      <!-- 搜索态 Chip：搜索框在顶栏，列表这一头必须能看出「现在看的是筛选结果」并一键退出 -->
+      <button
+        v-if="searching"
+        type="button"
+        class="flex h-6 min-w-0 max-w-40 items-center gap-1 rounded-full bg-selected px-2 text-caption text-fg transition-colors hover:bg-hover"
+        :aria-label="t('mail.clearSearch')"
+        @click="emit('clear-search')"
+      >
+        <IconSearch class="size-3 shrink-0" aria-hidden="true" />
+        <span class="truncate">{{ searchText }}</span>
+        <IconX class="size-3 shrink-0" aria-hidden="true" />
+      </button>
+
       <!-- 批量动作：只在有目标时出现（旧实现也是勾了才显示） -->
       <template v-if="canDelete && targetIds.length > 0">
         <Tooltip v-if="!trashMode" :text="t('mail.moveToTrash')">
@@ -323,9 +359,9 @@ defineExpose({
 
     <EmptyState
       v-else-if="showEmpty"
-      :icon="IconInbox"
-      :title="emptyTitle || t('mail.emptyInbox')"
-      :description="emptyDescription"
+      :icon="searching ? IconSearch : IconInbox"
+      :title="searching ? t('mail.emptySearch') : (emptyTitle || t('mail.emptyInbox'))"
+      :description="searching ? t('mail.emptySearchHint') : emptyDescription"
     />
 
     <!-- 滚动容器：整个列表只有这一个滚动条 -->

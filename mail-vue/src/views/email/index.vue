@@ -23,6 +23,7 @@ import {starAdd, starCancel} from '@/request/star.js'
 import {useAccountStore} from '@/store/account.js'
 import {useSettingStore} from '@/store/setting.js'
 import {useMailPrefs} from '@/composables/useMailPrefs.js'
+import {matchesQuery, useSearchQuery} from '@/composables/useSearchQuery.js'
 import {sleep} from '@/utils/time-utils.js'
 
 defineOptions({name: 'email'})
@@ -32,13 +33,15 @@ const route = useRoute()
 const accountStore = useAccountStore()
 const settingStore = useSettingStore()
 const {prefs} = useMailPrefs()
+const search = useSearchQuery()
 
 const workspace = ref(null)
 
-function fetchList(cursor, size) {
+/** `filters` 由 `MailWorkspace` 传进来（`?q=` 解析结果），没在搜时是 `{}` */
+function fetchList(cursor, size, filters = {}) {
     const accountId = accountStore.currentAccountId
     const allReceive = accountStore.currentAccount?.allReceive
-    return emailList(accountId, allReceive, cursor, prefs.timeSort, size, 0).then((data) => {
+    return emailList(accountId, allReceive, cursor, prefs.timeSort, size, 0, filters).then((data) => {
         if (data?.latestEmail) {
             // 长轮询要靠这两个字段判断「这一批还属于当前邮箱吗」
             data.latestEmail.reqAccountId = accountId
@@ -80,6 +83,11 @@ async function latest() {
             for (const email of list ?? []) {
                 if (existIds.has(email.emailId)) continue
                 existIds.add(email.emailId)
+                // 搜索态下列表是筛选结果，新邮件也得过一遍同一套条件，否则会插进一封不符合条件的行。
+                // `/email/latest` 刻意不带过滤参数（它的游标是「全局最新一封的 id」，
+                // 缩小它会让轮询从一个偏小的 id 起反复拉回同一批），所以判定放在这里，
+                // 用的是 `useSearchQuery` 的本地兜底谓词 —— 字段与后端过滤一一对应。
+                if (search.active.value && !matchesQuery(email, search.query.value)) continue
                 email.reqAccountId = accountId
                 email.allReceive = allReceive
                 workspace.value?.addItem(email)

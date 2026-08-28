@@ -17,6 +17,10 @@
  *   再去请求单封邮件接口，后端也没有这个接口。
  *
  * 已读的时机沿用旧实现：**打开就标已读**（`emailRead`），并同步更新侧栏角标。
+ *
+ * 搜索（§7.5）也收在这一层：`?q=` 由 `useSearchQuery()` 解析，条件作为**第三个参数**
+ * 交给视图的 `fetch`。四个视图因此各自只多一行「把它转给自己的请求函数」，
+ * 而「搜索态 Chip、条件变了重新取数、清空搜索」这些形状一致的部分只写一遍。
  */
 import {computed, onActivated, onDeactivated, onMounted, onUnmounted, ref, watch} from 'vue'
 import {useRoute, useRouter} from 'vue-router'
@@ -24,6 +28,7 @@ import {MailList, MailReader} from '@/components/domain'
 import {useBreakpoint} from '@/composables/useBreakpoint.js'
 import {useMailPrefs} from '@/composables/useMailPrefs.js'
 import {useCounts} from '@/composables/useCounts.js'
+import {useSearchQuery} from '@/composables/useSearchQuery.js'
 import {registerMailActions, setMailSelection} from '@/composables/useMailActions.js'
 import {useEmailStore} from '@/store/email.js'
 import {emailRead, emailUnread} from '@/request/email.js'
@@ -32,7 +37,7 @@ import {hasPerm} from '@/perm/perm.js'
 import {cn} from '@/utils/cn.js'
 
 const props = defineProps({
-    /** `(cursor, size) => Promise<{list, total, latestEmail?}>` */
+    /** `(cursor, size, search) => Promise<{list, total, latestEmail?}>` */
     fetch: {type: Function, required: true},
     /** 星标接口（星标视图里取消星标要把行摘掉，所以由调用方接管回调） */
     starAdd: {type: Function, default: undefined},
@@ -61,6 +66,7 @@ const router = useRouter()
 const {isMobile} = useBreakpoint()
 const {prefs} = useMailPrefs()
 const {refresh: refreshCounts} = useCounts()
+const search = useSearchQuery()
 const emailStore = useEmailStore()
 
 const listRef = ref(null)
@@ -68,6 +74,16 @@ const active = ref(null)
 
 const canDelete = computed(() => hasPerm('email:delete'))
 const canReply = computed(() => props.showReply && hasPerm('email:send'))
+
+/**
+ * 列表真正调用的取数函数：把 `?q=` 解析出的过滤条件当第三个参数传给视图的 `fetch`。
+ *
+ * 条件在**每次调用时**读一遍（而不是闭包捕获一份），所以翻页拿到的一定是当前条件；
+ * 「条件变了要从头拉」由 `MailList` 的 `searchText` watch 负责，两件事分开。
+ */
+function fetchPage(cursor, size) {
+    return props.fetch(cursor, size, search.listParams.value)
+}
 
 /** 窄屏：窗格整页盖上来；宽屏：按记忆的位置分栏 */
 const paneMode = computed(() => {
@@ -334,7 +350,7 @@ defineExpose({
     <MailList
       v-show="paneMode !== 'full'"
       ref="listRef"
-      :fetch="fetch"
+      :fetch="fetchPage"
       :size="size"
       :star-add="starAdd"
       :star-cancel="starCancel"
@@ -346,6 +362,7 @@ defineExpose({
       :show-status="showStatus"
       :trash-mode="trashMode"
       :can-delete="canDelete"
+      :search-text="search.text.value"
       :empty-title="emptyTitle"
       :empty-description="emptyDescription"
       :class="paneMode === 'none' || paneMode === 'full'
@@ -359,6 +376,7 @@ defineExpose({
       @unread="markUnread"
       @star="afterStar"
       @unstar="afterStar"
+      @clear-search="search.clear()"
     />
 
     <MailReader

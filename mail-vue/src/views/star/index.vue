@@ -26,8 +26,8 @@ const emailStore = useEmailStore()
 
 const workspace = ref(null)
 
-function fetchList(cursor, size) {
-    return starList(cursor, size)
+function fetchList(cursor, size, filters = {}) {
+    return starList(cursor, size, filters)
 }
 
 /** 取消星标：本列表摘行 + 广播给其它列表 */
