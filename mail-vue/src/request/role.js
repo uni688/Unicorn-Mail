@@ -4,12 +4,16 @@ export function roleAdd(params) {
     return http.post('/role/add',params)
 }
 
-export function rolePermTree() {
-    return http.get('/role/tree')
+/**
+ * 权限树与身份列表多带一个 `config`：管理页把失败画进 DataTable 的 error 态，
+ * 需要 `noMsg: true` 让拦截器别再弹一次 toast（见 `axios/index.js`）。
+ */
+export function rolePermTree(config = {}) {
+    return http.get('/role/tree', config)
 }
 
-export function roleRoleList() {
-    return http.get('/role/list')
+export function roleRoleList(config = {}) {
+    return http.get('/role/list', config)
 }
 
 export function roleSet(params) {

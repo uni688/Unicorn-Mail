@@ -546,6 +546,20 @@ const en = {
         delRegKeysConfirm: 'Delete the {n} selected registration keys?',
         historyEmpty: 'Nobody has used this key yet',
         copyCode: 'Copy key',
+        /* Roles page */
+        emptyRole: 'No roles yet',
+        emptyRoleHint: 'A role decides which features a user gets, and how many mailboxes.',
+        setDefault: 'Set as default',
+        setDefaultConfirm: 'Make "{msg}" the default role?',
+        setDefaultHint: 'New sign-ups will get this role. Existing users keep theirs.',
+        delRoleHint: 'Users on this role will be moved to the default one.',
+        sortHint: 'Lower numbers come first',
+        sendType: 'Quota type',
+        banEmailHint: 'Comma separated. Full addresses, domains, or * to block everything',
+        /* `@` must be escaped as `{'@'}`, otherwise vue-i18n reads it as a linked message */
+        banEmailPlaceholder: "spam{'@'}example.com, example.com, *",
+        availDomainHint: 'Leave empty to allow every domain',
+        availDomainAll: 'All domains',
     },
     /* Sign in / sign up / bind / OAuth callback (§5.3). Copy that already exists on the
        legacy login view keeps its top-level keys; only the new bits live here. */

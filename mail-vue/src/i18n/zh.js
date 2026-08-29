@@ -550,6 +550,20 @@ const zh = {
         delRegKeysConfirm: '确认删除选中的 {n} 个注册码吗？',
         historyEmpty: '还没有人用过这个注册码',
         copyCode: '复制注册码',
+        /* 权限身份页 */
+        emptyRole: '还没有权限身份',
+        emptyRoleHint: '身份决定一个用户能用哪些功能、能开几个邮箱。',
+        setDefault: '设为默认',
+        setDefaultConfirm: '把「{msg}」设为默认身份吗？',
+        setDefaultHint: '之后注册的新用户都会拿到这个身份。已有用户不变。',
+        delRoleHint: '用着这个身份的用户会被移到默认身份。',
+        sortHint: '数字越小越靠前',
+        sendType: '额度类型',
+        banEmailHint: '逗号分隔。可以写完整邮箱、域名，或 * 拦下全部',
+        /* `@` 要写成 `{'@'}`，否则 vue-i18n 当成链接消息（同 `paletteHint`） */
+        banEmailPlaceholder: "spam{'@'}example.com, example.com, *",
+        availDomainHint: '不选就是全部域名都能用',
+        availDomainAll: '全部域名',
     },
     /* 登录 / 注册 / 绑定 / OAuth 回调（§5.3）。旧登录页已有的文案继续用顶层键，
        这里只补新增的四个视图需要、旧页面没有的部分。 */
