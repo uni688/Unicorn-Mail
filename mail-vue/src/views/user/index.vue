@@ -1,1294 +1,646 @@
-<template>
-  <div class="user-box">
-    <div class="header-actions">
-      <Icon class="icon" icon="ion:add-outline" width="23" height="23" @click="openAdd"/>
-      <div class="search">
-        <el-input
-            v-model="params.email"
-            class="search-input"
-            :placeholder="$t('searchByEmail')"
-        >
-        </el-input>
-      </div>
-      <el-select v-model="params.status" placeholder="Select" class="status-select"
-                 :style="`width: ${locale === 'en' ? 95 : 80 }px`">
-        <el-option :key="-1" :label="$t('all')" :value="-1"/>
-        <el-option :key="0" :label="$t('active')" :value="0"/>
-        <el-option :key="1" :label="$t('banned')" :value="1"/>
-        <el-option :key="-2" :label="$t('deleted')" :value="-2"/>
-      </el-select>
-      <Icon class="icon" icon="iconoir:search" @click="search" width="20" height="20"/>
-      <Icon class="icon" @click="changeTimeSort" icon="material-symbols-light:timer-arrow-down-outline"
-            v-if="params.timeSort === 1" width="28" height="28"/>
-      <Icon class="icon" @click="changeTimeSort" icon="material-symbols-light:timer-arrow-up-outline" v-else width="28"
-            height="28"/>
-      <Icon class="icon" icon="ion:reload" width="18" height="18" @click="refresh"/>
-      <Icon class="icon" icon="uiw:delete" width="16" height="16" @click="delUser"/>
-    </div>
-    <el-scrollbar ref="scrollbarRef" class="scrollbar">
-      <div>
-        <div class="loading" :class="tableLoading ? 'loading-show' : 'loading-hide'"
-             :style="first ? 'background: transparent' : ''">
-          <loading/>
-        </div>
-        <el-table
-            @filter-change="tableFilter"
-            :empty-text="first ? '' : null"
-            :data="users"
-            :preserve-expanded-content="preserveExpanded"
-            style="width: 100%;"
-            ref="tableRef"
-            @cell-contextmenu="handleContextmenu"
-            :cell-class-name="cellClassName"
-        >
-          <el-table-column :width="expandWidth" type="selection" :selectable="row => row.type !== 0" />
-          <el-table-column show-overflow-tooltip :tooltip-formatter="tableRowFormatter" :label="$t('tabEmailAddress')"
-                           :min-width="emailWidth">
-            <template #default="props">
-              <div style="display: flex;gap: 5px">
-                <div class="email-row">{{ props.row.email }}</div>
-                <el-tag type="warning" v-if="props.row.username">L</el-tag>
-              </div>
-            </template>
-          </el-table-column>
-          <el-table-column :formatter="formatterReceive" label-class-name="receive" column-key="receive"
-                           :filtered-value="filteredValue" :filters="filters" :width="receiveWidth"
-                           :label="$t('tabReceived')"
-                           prop="receiveEmailCount"/>
-          <el-table-column :formatter="formatterSend" label-class-name="send" column-key="send"
-                           :filtered-value="filteredValue" :filters="filters" v-if="sendNumShow" :label="$t('tabSent')"
-                           prop="sendEmailCount"/>
-          <el-table-column :formatter="formatterAccount" label-class-name="account" column-key="account"
-                           :filtered-value="filteredValue" :filters="filters" v-if="accountNumShow"
-                           :label="$t('tabMailboxes')"
-                           prop="accountCount"/>
-          <el-table-column v-if="createTimeShow" :label="$t('tabRegisteredAt')" min-width="160" prop="createTime">
-            <template #default="props">
-              {{ tzDayjs(props.row.createTime).format('YYYY-MM-DD HH:mm') }}
-            </template>
-          </el-table-column>
-          <el-table-column v-if="statusShow" min-width="60px" :label="$t('tabStatus')" prop="status">
-            <template #default="props">
-              <el-tag disable-transitions v-if="props.row.isDel === 1" type="info">{{ $t('deleted') }}</el-tag>
-              <el-tag disable-transitions v-else-if="props.row.status === 0" type="primary">{{ $t('active') }}</el-tag>
-              <el-tag disable-transitions v-else-if="props.row.status === 1" type="danger">{{ $t('banned') }}</el-tag>
-            </template>
-          </el-table-column>
-          <el-table-column v-if="typeShow" :label="$t('tabRole')" min-width="140" prop="type">
-            <template #default="props">
-              <div class="type">
-                {{ toRoleName(props.row.type) }}
-              </div>
-            </template>
-          </el-table-column>
-          <el-table-column :label="$t('tabSetting')" :width="settingWidth">
-            <template #default="props">
-              <el-button size="small" type="primary" v-if="(props.row.type === 0 && userStore.user.type !== 0)" >{{ $t('action') }}</el-button>
-              <el-dropdown v-else >
-                <el-button size="small" type="primary">{{ $t('action') }}</el-button>
-                <template #dropdown>
-                  <el-dropdown-menu>
-                    <el-dropdown-item @click="openSetPwd(props.row)" >{{ $t('chgPwd') }}</el-dropdown-item>
-                    <el-dropdown-item @click="openSetType(props.row)" >{{ $t('perm') }}</el-dropdown-item>
-                    <template v-if="props.row.type !== 0">
-                      <el-dropdown-item v-if="props.row.isDel !== 1" @click="setStatus(props.row)">
-                        {{ setStatusName(props.row) }}
-                      </el-dropdown-item>
-                      <el-dropdown-item v-else @click="restore(props.row)">{{ $t('restore') }}</el-dropdown-item>
-                    </template>
-                    <el-dropdown-item @click="openAccountList(props.row.userId)" >{{ $t('account') }}</el-dropdown-item>
-                    <el-dropdown-item @click="openDetails(props.row)" >{{ $t('details') }}</el-dropdown-item>
-                  </el-dropdown-menu>
-                </template>
-              </el-dropdown>
-            </template>
-          </el-table-column>
-        </el-table>
-        <div class="pagination" v-if="total > 10">
-          <el-pagination
-              :size="pageSize"
-              :current-page="params.num"
-              :page-size="params.size"
-              :pager-count="pagerCount"
-              :page-sizes="[10, 15, 20, 25, 30, 50]"
-              background
-              :layout="layout"
-              :total="total"
-              @size-change="sizeChange"
-              @current-change="numChange"
-          />
-          <el-pagination
-              v-if="phonePageShow"
-              :size="pageSize"
-              :current-page="params.num"
-              :page-size="params.size"
-              :pager-count="pagerCount"
-              :page-sizes="[10, 15, 20, 25, 30, 50]"
-              background
-              layout="sizes, total"
-              :total="total"
-              @size-change="sizeChange"
-              @current-change="numChange"
-          />
-        </div>
-      </div>
-    </el-scrollbar>
-    <el-dialog class="dialog" v-model="setPwdShow" :title="$t('changePassword')" @closed="resetUserForm">
-      <div class="dialog-box">
-        <el-input v-model="userForm.password" type="password" :placeholder="$t('newPassword')" autocomplete="off">
-        </el-input>
-        <el-button class="btn" type="primary" :loading="settingLoading" @click="updatePwd"
-        >{{ $t('save') }}
-        </el-button>
-      </div>
-    </el-dialog>
-    <el-dialog class="dialog" v-model="setTypeShow" :title="$t('changePerm')" @closed="resetUserForm">
-      <div class="dialog-box">
-        <el-input disabled :model-value="$t('admin')" v-if="userForm.type === 0"/>
-        <el-select v-else v-model="userForm.type" placeholder="Select">
-          <el-option v-for="item in roleList" :label="item.name" :value="item.roleId" :key="item.roleId"/>
-        </el-select>
-        <el-button :disabled="userForm.type === 0" class="btn" :loading="settingLoading" type="primary" @click="setType"
-        >{{ $t('save') }}
-        </el-button>
-      </div>
-    </el-dialog>
-    <el-dialog v-model="showAdd" :title="$t('addUser')" @closed="resetAddForm">
-      <div class="container">
-        <el-input v-model="addForm.email" type="text" :placeholder="$t('emailAccount')" autocomplete="off">
-          <template #append>
-            <div @click.stop="openSelect">
-              <el-select
-                  ref="mySelect"
-                  v-model="addForm.suffix"
-                  :placeholder="$t('select')"
-                  class="select"
-              >
-                <el-option
-                    v-for="item in domainList"
-                    :key="item"
-                    :label="item"
-                    :value="item"
-                />
-              </el-select>
-              <div>
-                <span>{{ addForm.suffix }}</span>
-                <Icon class="setting-icon" icon="mingcute:down-small-fill" width="20" height="20"/>
-              </div>
-            </div>
-          </template>
-        </el-input>
-        <el-input type="password" v-model="addForm.password" :placeholder="$t('password')"/>
-        <el-select v-model="addForm.type" :placeholder="$t('perm')">
-          <el-option v-for="item in roleList" :label="item.name" :value="item.roleId" :key="item.roleId"/>
-        </el-select>
-        <el-button class="btn" type="primary" @click="submit" :loading="addLoading"
-        >{{ $t('add') }}
-        </el-button>
-      </div>
-    </el-dialog>
-    <el-dialog class="account-dialog" v-model="accountShow" :title="t('userAccount')" @closed="resetAccountList" >
-      <el-table :data="accountList" style="height: 480px" v-loading="accountLoading" element-loading-background="transparent" :empty-text="accountLoading ? '' : null">
-        <el-table-column property="email" :label="t('emailAccount')" >
-          <template #default="props">
-            <div class="email-row">{{ props.row.email }}</div>
-          </template>
-        </el-table-column>
-        <el-table-column property="address" :label="t('tabStatus')"  :width="locale === 'en' ? 75 : 65" >
-          <template #default="props">
-            <el-tag type="primary" disable-transitions v-if="props.row.isDel === 0">{{$t('active')}}</el-tag>
-            <el-tag type="info" disable-transitions v-if="props.row.isDel === 1">{{$t('deleted')}}</el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column :label="t('action')" :width="locale === 'en' ? 75 : 65" >
-          <template #default="props">
-            <el-dropdown trigger="click">
-              <el-button type="primary" size="small">{{t('action')}}</el-button>
-              <template #dropdown>
-                <el-dropdown-menu>
-                  <el-dropdown-item @click="deleteAccount(props.row)">{{ $t('delete') }}</el-dropdown-item>
-                </el-dropdown-menu>
-              </template>
-            </el-dropdown>
-          </template>
-        </el-table-column>
-      </el-table>
-      <div class="account-pagination">
-        <el-pagination
-            :disabled="accountLoading"
-            background
-
-            layout="prev, pager, next"
-            :pager-count="3"
-            :total="accountParams.total"
-            @current-change="accountCurChange"
-        />
-      </div>
-    </el-dialog>
-    <el-dialog class="account-dialog" v-model="detailsShow" :title="t('userDetails')"  >
-      <div class="details">
-        <div v-if="userDetails.username"><span class="details-item-title">LinuxDo:</span>
-          <el-avatar :src="userDetails.avatar" :size="30" class="linuxdo-avatar"  />
-          <span style="margin: 0 10px">用户名：{{userDetails.username}}</span>
-          <span>
-                    等级：<el-tag type="success">{{userDetails.trustLevel}}</el-tag>
-                  </span>
-        </div>
-        <div v-if="!sendNumShow"><span
-            class="details-item-title">{{ $t('tabSent') }}:</span>{{ userDetails.sendEmailCount }}
-        </div>
-        <div v-if="!accountNumShow"><span class="details-item-title">{{ $t('tabMailboxes') }}:</span>{{
-            userDetails.accountCount
-          }}
-        </div>
-        <div v-if="!createTimeShow"><span class="details-item-title">{{ $t('tabRegisteredAt') }}:</span>{{
-            tzDayjs(userDetails.createTime).format('YYYY-MM-DD HH:mm')
-          }}
-        </div>
-        <div v-if="!typeShow"><span class="details-item-title">{{ $t('perm') }}:</span>
-          {{ toRoleName(userDetails.type) }}
-        </div>
-        <div v-if="!statusShow">
-          <span class="details-item-title">{{ $t('tabStatus') }}:</span>
-          <el-tag disable-transitions v-if="userDetails.isDel === 1" type="info">{{ $t('deleted') }}</el-tag>
-          <el-tag disable-transitions v-else-if="userDetails.status === 0" type="primary">{{ $t('active') }}
-          </el-tag>
-          <el-tag disable-transitions v-else-if="userDetails.status === 1" type="danger">{{ $t('banned') }}
-          </el-tag>
-        </div>
-        <div><span class="details-item-title">{{ $t('registrationIp') }}:</span>{{
-            userDetails.createIp || $t('unknown')
-          }}
-        </div>
-        <div><span class="details-item-title">{{ $t('recentIP') }}:</span>{{
-            userDetails.activeIp || $t('unknown')
-          }}
-        </div>
-        <div><span class="details-item-title">{{ $t('recentActivity') }}:</span>{{
-            userDetails.activeTime ? tzDayjs(userDetails.activeTime).format('YYYY-MM-DD') : $t('unknown')
-          }}
-        </div>
-        <div><span
-            class="details-item-title">{{ $t('loginDevice') }}:</span>{{ userDetails.device || $t('unknown') }}
-        </div>
-        <div><span class="details-item-title">{{ $t('loginSystem') }}:</span>{{ userDetails.os || $t('unknown') }}
-        </div>
-        <div><span
-            class="details-item-title">{{ $t('browserLogin') }}:</span>{{ userDetails.browser || $t('unknown') }}
-        </div>
-        <div>
-          <span class="details-item-title">{{ $t('sendEmail') }}:</span>
-          <span>{{ formatSendCount(userDetails) }}</span>
-          <el-tag style="margin-left: 10px" v-if="userDetails.sendAction.hasPerm">
-            {{ formatSendType(userDetails) }}
-          </el-tag>
-          <el-button size="small" style="margin-left: 10px"
-                     v-if="userDetails.sendAction.hasPerm && userDetails.sendAction.sendCount"
-                     @click="resetSendCount(userDetails)" type="primary">{{ $t('reset') }}
-          </el-button>
-        </div>
-      </div>
-    </el-dialog>
-    <el-dropdown
-        :show-timeout="0"
-        :hide-timeout="0"
-        ref="dropdownRef"
-        @visible-change="visibleChange"
-        :virtual-ref="triggerRef"
-        :show-arrow="false"
-        :popper-options="{
-      modifiers: [{ name: 'offset', options: { offset: [0, 0] } }],
-    }"
-        virtual-triggering
-        trigger="contextmenu"
-        placement="bottom-start"
-    >
-      <template #dropdown>
-        <el-dropdown-menu>
-          <el-dropdown-item @click="openSetPwd(rightClickUser)">
-            <template #default>
-              <div class="right-dropdown-item">
-                <icon icon="fluent:fingerprint-20-filled" width="22" height="22" />
-                <span>{{t('changePassword')}}</span>
-              </div>
-            </template>
-          </el-dropdown-item>
-          <el-dropdown-item @click="openSetType(rightClickUser)">
-            <template #default>
-              <div class="right-dropdown-item">
-                <icon icon="fluent:lock-closed-16-regular" width="21" height="21" />
-                <span>{{ t('setRole') }}</span>
-              </div>
-            </template>
-          </el-dropdown-item>
-          <el-dropdown-item v-if="rightClickUser.type !== 0">
-            <template #default>
-              <div class="right-dropdown-item" v-if="rightClickUser.isDel !== 1" @click="setStatus(rightClickUser)" >
-                <Icon icon="ion:reload" v-if="rightClickUser.status" style="margin-left: 1px;margin-right: 1px" width="19" height="19" />
-                <Icon icon="ion:ban-outline" v-else style="margin-left: 1px;margin-right: 1px" width="19" height="19" />
-                <span>{{ setRightStatusName(rightClickUser) }}</span>
-              </div>
-              <div class="right-dropdown-item" v-else @click="restore(rightClickUser)">
-                <Icon icon="ion:reload" style="margin-left: 1px;margin-right: 1px" width="19" height="19" />
-                <span>{{ t('restoreUser') }}</span>
-              </div>
-            </template>
-          </el-dropdown-item>
-          <el-dropdown-item @click="openAccountList(rightClickUser.userId)" >
-            <template #default>
-              <div class="right-dropdown-item" >
-                <Icon icon="hugeicons:mailbox-01" width="20" height="20" />
-                <span>{{ t('userEmail') }}</span>
-              </div>
-            </template>
-          </el-dropdown-item>
-          <el-dropdown-item @click="openDetails(rightClickUser)" >
-            <template #default>
-              <div class="right-dropdown-item" >
-                <Icon icon="si:user-alt-2-line" width="20" height="20" />
-                <span>{{ t('userDetails') }}</span>
-              </div>
-            </template>
-          </el-dropdown-item>
-          <el-dropdown-item v-if="rightClickUser.type !== 0" @click="delOneUser(rightClickUser)" >
-            <template #default>
-              <div class="right-dropdown-item" >
-                <Icon icon="uiw:delete" width="18" height="18" style="margin-left: 1px;margin-right: 1px" />
-                <span>{{ t('adminDeleteUser') }}</span>
-              </div>
-            </template>
-          </el-dropdown-item>
-        </el-dropdown-menu>
-      </template>
-    </el-dropdown>
-  </div>
-</template>
-
 <script setup>
-import {defineOptions, h, reactive, ref, watch} from 'vue'
+/**
+ * 用户管理 — 管理域表格页第三张（§10.4 / §7.9）
+ *
+ * 从 1294 行的 el-table 单文件换成 `DataTable`：取数与动作全在
+ * `useUserAdmin()` 里，这里只剩模板与弹窗开合。旧版的 5 个断点列开关
+ * （`statusShow` / `createTimeShow` / …）和 `window.onresize` 一起删掉了 ——
+ * DataTable 在 `<md` 整表退化成卡片，字段一个都不少，不必再靠藏列保命。
+ *
+ * 三处和旧版有意不同（原因写在 `useUserAdmin.js` 顶部）：
+ * 1. 排序挂在「注册时间」表头，不再是工具条上那个无状态的沙漏图标；
+ * 2. 收信/发信/邮箱数的「含已删除」筛选，从 el-table 列筛选器换成表头多选菜单；
+ * 3. 详情弹窗永远显示全部字段，不再按窄屏补漏。
+ *
+ * 右键菜单里的每一项都能在别处找到同样的入口（行内「⋯」菜单 + 工具条批量删除），
+ * 这是 ContextMenu 的硬规矩：右键是快捷方式，不是唯一路径。
+ */
+import {computed, ref} from 'vue'
+import {useI18n} from 'vue-i18n'
+import IconPlus from '~icons/lucide/plus'
+import IconSearch from '~icons/lucide/search'
+import IconRefresh from '~icons/lucide/refresh-cw'
+import IconTrash from '~icons/lucide/trash-2'
+import IconEllipsis from '~icons/lucide/ellipsis'
+import IconUsers from '~icons/lucide/users-round'
+import IconMailbox from '~icons/lucide/mailbox'
+import IconFilter from '~icons/lucide/filter'
 import {
-  userList,
-  userDelete,
-  userSetPwd,
-  userSetStatus,
-  userSetType,
-  userAdd,
-  userRestSendCount,
-  userRestore,
-  userDeleteAccount,
-  userAllAccount
-} from '@/request/user.js'
-import {roleSelectUse} from "@/request/role.js";
-import {Icon} from "@iconify/vue";
-import loading from "@/components/loading/index.vue";
-import {tzDayjs} from "@/utils/day.js";
-import {useSettingStore} from "@/store/setting.js";
-import {isEmail} from "@/utils/verify-utils.js";
-import {useRoleStore} from "@/store/role.js";
-import {useUserStore} from "@/store/user.js";
-import {useI18n} from 'vue-i18n';
+    AlertDialog, Avatar, Badge, Button, ContextMenu, DataTable, Dialog,
+    DropdownMenu, Field, Input, MenuCheckboxItem, MenuItem, MenuLabel,
+    MenuSeparator, Select,
+} from '@/components/ui'
+import {EmptyState, ErrorState} from '@/components/composite'
+import {hasPerm} from '@/perm/perm.js'
+import {useSettingStore} from '@/store/setting.js'
+import {useUserStore} from '@/store/user.js'
+import {USER_STATUS, useUserAdmin} from '@/composables/useUserAdmin.js'
 
-defineOptions({
-  name: 'user'
-})
+defineOptions({name: 'user'})
 
-const {t, locale} = useI18n();
-const roleStore = useRoleStore()
-const userStore = useUserStore()
+const {t} = useI18n()
 const settingStore = useSettingStore()
-const filteredValue = ['normal', 'del']
-const filters = [{text: t('active'), value: 'normal'}, {text: t('deleted'), value: 'del'}]
-const preserveExpanded = ref(false)
-const emailWidth = ref(230)
-const expandWidth = ref(40)
-const settingWidth = ref(null)
-const sendNumShow = ref(true)
-const accountNumShow = ref(true)
-const createTimeShow = ref(true)
-const statusShow = ref(true)
-const typeShow = ref(true)
-const receiveWidth = ref(null)
-const phonePageShow = ref(false)
-const detailsShow = ref(false);
-const layout = ref('prev, pager, next,  sizes, total')
-const pageSize = ref('')
-const users = ref([])
-const tableRef = ref({})
-const userDetails = ref({})
-const total = ref(0)
-const first = ref(true)
-const scrollbarRef = ref(null)
-const accountLoading = ref(false)
-const dropdownRef = ref(null);
-const dropdownShow = ref(false);
-const rightClickUser = ref({});
-const position = ref(
-    DOMRect.fromRect({
-      x: 0,
-      y: 0,
-    })
-)
+const userStore = useUserStore()
 
-const triggerRef = ref({
-  getBoundingClientRect() {
-    return position.value;
-  }
-})
-const domainList = settingStore.domainList
+const admin = useUserAdmin()
+const {
+    rows, total, loading, errorDetail, params, selection, getList,
+    roleOptions, roleName, sort, setSort, search, setPage, setStatus, refresh,
+    countMode, countOf, toggleCountMode,
+    addForm, addLoading, domainOptions, resetAddForm, submitAdd,
+    userForm, formLoading, openForm, resetUserForm, submitPwd, submitType,
+    statusActionLabel, statusActionLongLabel, toggleStatus, restore, removeUsers, resetSendCount,
+    accountRows, accountLoading, accountErrorDetail, accountParams,
+    openAccountList, setAccountPage, removeAccount,
+    sendCountText, sendTypeText, formatTime, canManage,
+} = admin
 
-const addForm = reactive({
-  email: '',
-  suffix: settingStore.domainList[0],
-  password: '',
-  type: null,
-})
+const canDelete = computed(() => hasPerm('user:delete'))
 
-const params = reactive({
-  email: '',
-  num: 1,
-  size: 15,
-  timeSort: 0,
-  status: -1
-})
-let chooseUser = {}
-const userForm = reactive({
-  password: null,
-  type: -1,
-  userId: 0,
-})
+/* ------------------------------------------------------------------ 列定义 */
+
+const statusOptions = computed(() => [
+    {label: t('allStatus'), value: USER_STATUS.ALL},
+    {label: t('active'), value: USER_STATUS.ACTIVE},
+    {label: t('banned'), value: USER_STATUS.BANNED},
+    {label: t('deleted'), value: USER_STATUS.DELETED},
+])
+
+/** 三个计数列共用一套表头菜单，靠 field 区分 */
+const COUNT_COLUMNS = [
+    {key: 'receiveEmailCount', field: 'receive', labelKey: 'tabReceived'},
+    {key: 'sendEmailCount', field: 'send', labelKey: 'tabSent'},
+    {key: 'accountCount', field: 'account', labelKey: 'tabMailboxes'},
+]
+
+const columns = computed(() => [
+    {key: 'email', label: t('userEmail'), minWidth: '200px', truncate: true},
+    ...COUNT_COLUMNS.map(c => ({
+        key: c.key, label: t(c.labelKey), width: '110px', align: 'end',
+    })),
+    {key: 'createTime', label: t('tabRegisteredAt'), width: '150px', sortable: true, sortKey: 'createTime'},
+    {key: 'status', label: t('tabStatus'), width: '96px'},
+    {key: 'type', label: t('perm'), width: '130px', truncate: true},
+    {key: 'actions', label: t('adminTable.actions'), width: '68px', align: 'end', cardHidden: true},
+])
+
+/** 选择列：超级管理员不能被批量删（和旧版 `:selectable` 一致） */
+const selectableRow = (row) => row.type !== 0
+
+/* -------------------------------------------------------------- 弹窗开合 */
 
 const showAdd = ref(false)
-const accountShow = ref(false)
-const addLoading = ref(false);
-const setTypeShow = ref(false)
-const setPwdShow = ref(false)
-const pagerCount = ref(10)
-const settingLoading = ref(false)
-const tableLoading = ref(true)
-const roleList = reactive([])
-const mySelect = ref({})
-const accountList = reactive([])
-const accountParams = reactive({
-  size: 10,
-  num: 0,
-  total: 0,
-  userId: 0,
-})
-
-roleSelectUse().then(list => {
-  roleList.length = 0
-  roleList.push(...list)
-})
-
-const paramsStar = localStorage.getItem('user-params')
-if (paramsStar) {
-  const localParams = JSON.parse(paramsStar)
-  params.num = localParams.num
-  params.size = localParams.size
-  params.timeSort = localParams.timeSort
-  params.status = localParams.status
-}
-
-watch(() => params, () => {
-  localStorage.setItem('user-params', JSON.stringify(params))
-}, {
-  deep: true
-})
-
-watch(() => roleStore.refresh, () => {
-  roleSelectUse().then(list => {
-    roleList.length = 0
-    roleList.push(...list)
-  })
-})
-
-watch(() => userStore.refreshList, () => {
-  getUserList(false)
-})
-
-getUserList()
-
-const filterItem = reactive({
-  send: ['normal', 'del'],
-  account: ['normal', 'del'],
-  receive: ['normal', 'del']
-})
-
-window.addEventListener('wheel', (event) => {
-  if (dropdownShow.value) {
-    dropdownRef.value.handleClose();
-  }
-})
-
-function visibleChange(e) {
-  dropdownShow.value = e;
-  if (!e) {
-    rightClickUser.value.checkedClass = '';
-  }
-}
-
-function cellClassName({ row }) {
-  return row.checkedClass;
-}
-
-const handleContextmenu = (row, column, cell, event) => {
-
-  if (row.type === 0 && userStore.user.type !== 0) {
-    return
-  }
-
-  rightClickUser.value.checkedClass = '';
-
-  const { clientX, clientY } = event
-  position.value = DOMRect.fromRect({
-    x: clientX,
-    y: clientY,
-  })
-  event.preventDefault()
-  dropdownRef.value?.handleOpen()
-
-  row.checkedClass = 'checked-row';
-  rightClickUser.value = row;
-}
-
-function deleteAccount(account) {
-  ElMessageBox.confirm(t('delConfirm', {msg: account.email}), {
-    confirmButtonText: t('confirm'),
-    cancelButtonText: t('cancel'),
-    type: 'warning'
-  }).then(() => {
-    userDeleteAccount(account.accountId).then(() => {
-      getAccountList()
-      ElMessage({
-        message: t('delSuccessMsg'),
-        type: "success",
-        plain: true
-      })
-    })
-  });
-}
-function accountCurChange(e) {
-  accountParams.num = e
-  getAccountList()
-}
-
-function resetAccountList() {
-  accountList.length = 0
-  accountParams.num = 0
-  accountParams.size = 10
-  accountParams.total = 0
-}
-
-function openAccountList(userId) {
-  accountParams.userId = userId
-  getAccountList(true)
-  accountShow.value = true
-}
-
-function openDetails(user) {
-  userDetails.value = user;
-  detailsShow.value = true;
-}
-
-function getAccountList(loading = false) {
-  accountLoading.value = loading
-  userAllAccount(accountParams.userId,accountParams.num, accountParams.size).then(({list,total}) => {
-    accountList.length = 0
-    accountList.push(...list)
-    accountParams.total = total
-    accountLoading.value = false
-  })
-}
-
-function tableFilter(e) {
-
-  if (e.send) filterItem.send = e.send
-  if (e.account) filterItem.account = e.account
-  if (e.receive) filterItem.receive = e.receive
-
-}
-
-function formatterSend(e) {
-
-  if (filterItem.send.length === 2) {
-    return e.sendEmailCount + e.delSendEmailCount
-  }
-
-  if (filterItem.send.includes('normal')) {
-    return e.sendEmailCount
-  }
-
-  if (filterItem.send.includes('del')) {
-    return e.delSendEmailCount
-  }
-
-  return 0
-}
-
-function formatterAccount(e) {
-
-  if (filterItem.account.length === 2) {
-    return e.accountCount + e.delAccountCount
-  }
-
-  if (filterItem.account.includes('normal')) {
-    return e.accountCount
-  }
-
-  if (filterItem.account.includes('del')) {
-    return e.delAccountCount
-  }
-
-  return 0
-}
-
-function formatterReceive(e) {
-
-
-  if (filterItem.receive.length === 2) {
-    return e.receiveEmailCount + e.delReceiveEmailCount
-  }
-
-  if (filterItem.receive.includes('normal')) {
-    return e.receiveEmailCount
-  }
-
-  if (filterItem.receive.includes('del')) {
-    return e.delReceiveEmailCount
-  }
-
-  return 0
-}
-
-function setStatusName(user) {
-  if (user.isDel === 1) return t('restore')
-  if (user.status === 0) return t('btnBan')
-  if (user.status === 1) return t('enable')
-}
-
-function setRightStatusName(user) {
-  if (user.isDel === 1) return t('adminDeleteUser')
-  if (user.status === 0) return t('banUser')
-  if (user.status === 1) return t('enableUser')
-}
-
-const tableRowFormatter = (data) => {
-  return data.row.email
-}
-
-const openSelect = () => {
-  mySelect.value.toggleMenu()
-}
-
-function resetAddForm() {
-  addForm.email = ''
-  addForm.suffix = settingStore.domainList[0]
-  addForm.type = null
-  addForm.password = ''
-}
+const showPwd = ref(false)
+const showType = ref(false)
+const showAccounts = ref(false)
+const showDetails = ref(false)
+const details = ref(null)
 
 function openAdd() {
-  showAdd.value = true
+    resetAddForm()
+    showAdd.value = true
 }
 
-function submit() {
-
-  if (!addForm.email) {
-    ElMessage({
-      message: t('emptyEmailMsg'),
-      type: "error",
-      plain: true
-    })
-    return
-  }
-
-  if (!isEmail(addForm.email + addForm.suffix)) {
-    ElMessage({
-      message: t('notEmailMsg'),
-      type: "error",
-      plain: true
-    })
-    return
-  }
-
-  if (!addForm.password) {
-    ElMessage({
-      message: t('emptyPwdMsg'),
-      type: "error",
-      plain: true
-    })
-    return
-  }
-
-  if (addForm.password.length < 6) {
-    ElMessage({
-      message: t('pwdLengthMsg'),
-      type: "error",
-      plain: true
-    })
-    return
-  }
-
-  if (!addForm.type) {
-    ElMessage({
-      message: t('emptyRole'),
-      type: "error",
-      plain: true
-    })
-    return
-  }
-
-  addLoading.value = true
-  const form = {...addForm}
-  form.email = form.email + form.suffix
-  userAdd(form).then(() => {
-    addLoading.value = false
-    addForm.email = ''
-    ElMessage({
-      message: t('addSuccessMsg'),
-      type: "success",
-      plain: true
-    })
-    getUserList(false)
-  }).finally(res => {
-    addLoading.value = false
-  })
-}
-
-
-function formatSendType(user) {
-  if (user.sendAction.sendType === 'day') return t('daily')
-  if (user.sendAction.sendType === 'count') return t('total')
-  if (user.sendAction.sendType === 'ban') return t('sendBanned')
-  if (user.sendAction.sendType === 'internal') return t('sendInternal')
-}
-
-function formatSendCount(user) {
-
-  if (!user.sendAction.hasPerm) {
-    return t('unauthorized')
-  }
-
-  if (!user.sendAction.sendCount) {
-    return t('unlimited');
-  }
-
-  let count = user.sendCount + '/' + user.sendAction.sendCount
-
-  return count
-}
-
-function toRoleName(type) {
-
-  if (type === 0) {
-    return t('admin')
-  }
-
-  const index = roleList.findIndex(role => role.roleId === type)
-  if (index > -1) {
-    return roleList[index].name
-  }
-  return ""
-}
-
-function resetSendCount(user) {
-
-  ElMessageBox.confirm(t('reSendConfirm', {msg: user.email}), {
-    confirmButtonText: t('confirm'),
-    cancelButtonText: t('cancel'),
-    type: 'warning'
-  }).then(() => {
-    userRestSendCount(user.userId).then(() => {
-      ElMessage({
-        message: t('reSuccessMsg'),
-        type: "success",
-        plain: true
-      })
-      user.sendCount = 0
-    })
-  });
-}
-
-function delUser(user) {
-  const rows = tableRef.value.getSelectionRows();
-  const userIds = rows.map(row => row.userId);
-  if (userIds.length === 0) {
-    return;
-  }
-  ElMessageBox.confirm(t('delUsersConfirm'), {
-    confirmButtonText: t('confirm'),
-    cancelButtonText: t('cancel'),
-    type: 'warning'
-  }).then(() => {
-    userDelete(userIds).then(() => {
-      ElMessage({
-        message: t('delSuccessMsg'),
-        type: "success",
-        plain: true
-      })
-      getUserList(true)
-    })
-  });
-}
-
-function delOneUser(user) {
-  ElMessageBox.confirm(t('delConfirm', {msg: user.email}), {
-    confirmButtonText: t('confirm'),
-    cancelButtonText: t('cancel'),
-    type: 'warning'
-  }).then(() => {
-    userDelete([user.userId]).then(() => {
-      ElMessage({
-        message: t('delSuccessMsg'),
-        type: "success",
-        plain: true
-      })
-      getUserList(true)
-    })
-  });
-}
-
-function restore(user) {
-
-  const type = ref(0)
-
-  ElMessageBox.confirm(null, {
-    confirmButtonText: t('confirm'),
-    cancelButtonText: t('cancel'),
-    message: () => h('div', [
-      h('div', {class: 'mb-2'}, t('restoreConfirm', {msg: user.email}))
-      // h(ElRadioGroup, {
-      //   modelValue: type.value,
-      //   'onUpdate:modelValue': (val) => (type.value = val),
-      // }, [
-      //   h(ElRadio, {label: 'option1', value: 0}, t('normalRestore')),
-      //   h(ElRadio, {label: 'option2', value: 1}, t('allRestore')),
-      // ])
-    ]),
-    type: 'warning'
-  }).then(() => {
-    userRestore(user.userId, type.value).then(() => {
-      user.isDel = 0
-      ElMessage({
-        message: t('restoreSuccessMsg'),
-        type: "success",
-        plain: true
-      })
-    })
-  });
-}
-
-function setStatus(user) {
-  httpSetStatus(user);
-}
-
-function httpSetStatus(user) {
-  let status = user.status ? 0 : 1
-  userSetStatus({status: status, userId: user.userId}).then(() => {
-    user.status = status
-    ElMessage({
-      message: t('saveSuccessMsg'),
-      type: "success",
-      plain: true
-    })
-  })
-}
-
-function setType() {
-  settingLoading.value = true
-  userSetType({type: userForm.type, userId: userForm.userId}).then(() => {
-    chooseUser.type = userForm.type
-    setTypeShow.value = false
-    ElMessage({
-      message: t('saveSuccessMsg'),
-      type: "success",
-      plain: true
-    })
-
-  }).finally(() => {
-    settingLoading.value = false
-  })
-}
-
-
-function resetUserForm() {
-  userForm.password = null
-  userForm.userId = 0
-}
-
-function search() {
-  params.num = 1
-  getUserList()
-}
-
-function updatePwd() {
-
-  if (!userForm.password) {
-    ElMessage({
-      message: t('emptyPwdMsg'),
-      type: 'error',
-      plain: true,
-    })
-    return
-  }
-
-  if (userForm.password.length < 6) {
-    ElMessage({
-      message: t('pwdLengthMsg'),
-      type: 'error',
-      plain: true,
-    })
-    return
-  }
-
-  settingLoading.value = true
-  userSetPwd({password: userForm.password, userId: userForm.userId}).then(() => {
-    setPwdShow.value = false
-    ElMessage({
-      message: t('saveSuccessMsg'),
-      type: "success",
-      plain: true
-    })
-  }).finally(() => {
-    settingLoading.value = false
-  })
-}
-
-function openSetType(user) {
-  chooseUser = user
-  userForm.userId = user.userId
-  userForm.type = user.type
-  setTypeShow.value = true
+async function onSubmitAdd() {
+    if (await submitAdd()) showAdd.value = false
 }
 
 function openSetPwd(user) {
-  userForm.userId = user.userId
-  setPwdShow.value = true
+    openForm(user)
+    showPwd.value = true
 }
 
-function refresh() {
-  params.email = ''
-  params.num = 1
-  params.status = -1
-  params.timeSort = 0
-  getUserList();
-  roleSelectUse().then(list => {
-    roleList.length = 0
-    roleList.push(...list)
-  })
+function openSetType(user) {
+    openForm(user)
+    showType.value = true
 }
 
-function changeTimeSort() {
-  params.num = 1
-  params.timeSort = params.timeSort ? 0 : 1
-  getUserList()
+async function onSubmitPwd() {
+    if (await submitPwd()) {
+        showPwd.value = false
+        resetUserForm()
+    }
 }
 
-function numChange(num) {
-  params.num = num
-  getUserList()
+async function onSubmitType() {
+    if (await submitType()) {
+        showType.value = false
+        resetUserForm()
+    }
 }
 
-function sizeChange(size) {
-  params.size = size
-  getUserList()
+function openAccounts(user) {
+    showAccounts.value = true
+    openAccountList(user.userId)
 }
 
-function getUserList(loading = true) {
-
-  tableLoading.value = loading
-  const newParams = {...params}
-
-  if (newParams.status === -2) {
-    delete newParams.status
-    newParams.isDel = 1
-  }
-  userList(newParams).then(data => {
-    users.value = data.list.map(item => ({...item, checkedClass: ''}))
-    total.value = data.total
-    scrollbarRef.value?.setScrollTop(0);
-  }).finally(() => {
-    tableLoading.value = false
-    setTimeout(() => {
-      first.value = false
-    }, 200)
-  })
+function openDetails(user) {
+    details.value = user
+    showDetails.value = true
 }
 
-window.onresize = () => {
-  adjustWidth()
-};
+/* ------------------------------------------------------------ 确认类动作 */
 
-adjustWidth()
+const confirmOpen = ref(false)
+const confirmLoading = ref(false)
+const confirmData = ref({title: '', description: '', confirmText: '', tone: 'danger', run: null})
 
-function adjustWidth() {
-  const width = window.innerWidth
-  statusShow.value = width > 1090
-  createTimeShow.value = width > 1367
-  accountNumShow.value = width > 650
-  sendNumShow.value = width > 685
-  typeShow.value = width > 767
-  emailWidth.value = width > 480 ? 230 : null
-  settingWidth.value = width < 480 ? (locale.value === 'en' ? 85 : 75) : null
-  expandWidth.value = width < 480 ? 30 : 35
-  pagerCount.value = width < 768 ? 7 : 11
-  receiveWidth.value = width < 480 ? 90 : null
-  layout.value = width < 768 ? 'pager' : 'prev, pager, next,sizes, total'
-  phonePageShow.value = width < 768
-  pageSize.value = width < 380 ? 'small' : ''
+function ask(next) {
+    confirmData.value = {description: '', tone: 'danger', ...next}
+    confirmOpen.value = true
 }
 
+function askDelete(user) {
+    ask({
+        title: t('delConfirm', {msg: user.email}),
+        description: t('adminTable.delUserHint'),
+        confirmText: t('delete'),
+        run: () => removeUsers([user.userId]),
+    })
+}
+
+function askBatchDelete() {
+    const ids = [...selection.ids.value]
+    ask({
+        title: t('adminTable.delUsersConfirm', {n: ids.length}),
+        description: t('adminTable.delUserHint'),
+        confirmText: t('delete'),
+        run: () => removeUsers(ids),
+    })
+}
+
+/** 封禁要问，启用不问：启用是把限制放开，误点的代价小得多 */
+function askToggleStatus(user) {
+    if (user.status === 0) {
+        ask({
+            title: t('adminTable.banConfirm', {msg: user.email}),
+            description: t('adminTable.banHint'),
+            confirmText: t('btnBan'),
+            run: () => toggleStatus(user),
+        })
+        return
+    }
+    toggleStatus(user)
+}
+
+function askRestore(user) {
+    ask({
+        title: t('adminTable.restoreConfirm', {msg: user.email}),
+        description: t('adminTable.restoreHint'),
+        confirmText: t('restore'),
+        tone: 'default',
+        run: () => restore(user),
+    })
+}
+
+/** 已删除的行只有「恢复」，其余按当前状态在封禁/启用之间切 */
+function onStatusAction(user) {
+    if (user.isDel === 1) {
+        askRestore(user)
+        return
+    }
+    askToggleStatus(user)
+}
+
+function askDeleteAccount(account) {
+    ask({
+        title: t('delConfirm', {msg: account.email}),
+        confirmText: t('delete'),
+        run: () => removeAccount(account),
+    })
+}
+
+async function runConfirm() {
+    confirmLoading.value = true
+    try {
+        await confirmData.value.run?.()
+        confirmOpen.value = false
+    } finally {
+        confirmLoading.value = false
+    }
+}
+
+/* ------------------------------------------------------ 用户邮箱子表的列 */
+
+const accountColumns = computed(() => [
+    {key: 'email', label: t('userEmail'), minWidth: '200px', truncate: true},
+    {key: 'createTime', label: t('tabRegisteredAt'), width: '150px', formatter: v => formatTime(v)},
+    {key: 'actions', label: t('adminTable.actions'), width: '68px', align: 'end', cardHidden: true},
+])
+
+getList()
 </script>
 
-<style>
-.el-message-box__container {
-  align-items: start !important;
-}
+<template>
+  <div class="flex h-full min-h-0 flex-col bg-canvas">
+    <!-- 工具条：主行动在左，检索与批量维护在右（§7.9） -->
+    <div class="flex flex-wrap items-center gap-2 border-b border-line px-4 py-2.5">
+      <Button v-perm="'user:add'" variant="primary" size="sm" @click="openAdd">
+        <IconPlus class="size-4" />
+        {{ t('addUser') }}
+      </Button>
 
-.el-message-box__message {
-  word-break: break-all;
-}
+      <div class="ml-auto flex items-center gap-1.5">
+        <Select
+          :model-value="params.status"
+          size="sm"
+          class="w-28"
+          :options="statusOptions"
+          :aria-label="t('tabStatus')"
+          @update:model-value="setStatus"
+        />
+        <Input
+          v-model="params.email"
+          type="search"
+          size="sm"
+          clearable
+          class="w-36 sm:w-52"
+          :placeholder="t('searchEmail')"
+          :aria-label="t('searchEmail')"
+          @enter="search"
+          @clear="search"
+        />
+        <Button variant="ghost" size="icon-sm" :label="t('ui.search')" @click="search">
+          <IconSearch class="size-4" />
+        </Button>
+        <Button variant="ghost" size="icon-sm" :label="t('mail.refresh')" @click="refresh">
+          <IconRefresh class="size-4" />
+        </Button>
+      </div>
+    </div>
 
-.el-table-filter__content {
-  min-width: 0;
-}
-</style>
-<style lang="scss" scoped>
+    <div class="flex min-h-0 flex-1 flex-col p-4">
+      <DataTable
+        :columns="columns"
+        :rows="rows"
+        row-key="userId"
+        :aria-label="t('userManage')"
+        :loading="loading"
+        :error="errorDetail"
+        :selectable="canDelete && selectableRow"
+        :selection="selection"
+        :sort="sort"
+        :page="params.num"
+        :page-size="params.size"
+        :total="total"
+        class="min-h-0 flex-1"
+        scroll-class="min-h-0"
+        @update:sort="setSort"
+        @update:page="setPage"
+        @retry="getList"
+        @empty-action="openAdd"
+      >
+        <!-- 三个计数列的表头：勾「正常 / 已删除」，语义照搬旧列筛选器 -->
+        <template v-for="c in COUNT_COLUMNS" #[`header-${c.key}`]="{column}" :key="c.key">
+          <DropdownMenu align="end">
+            <template #trigger>
+              <button
+                type="button"
+                class="inline-flex items-center gap-1 rounded-sm text-inherit focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                :aria-label="t('adminTable.filterCount', {name: column.label})"
+              >
+                {{ column.label }}
+                <IconFilter
+                  class="size-3 shrink-0"
+                  :class="countMode[c.field].length === 2 ? 'opacity-40' : 'text-accent opacity-100'"
+                  aria-hidden="true"
+                />
+              </button>
+            </template>
+            <MenuLabel>{{ column.label }}</MenuLabel>
+            <MenuCheckboxItem
+              :model-value="countMode[c.field].includes('normal')"
+              @select="$event.preventDefault()"
+              @update:model-value="toggleCountMode(c.field, 'normal')"
+            >
+              {{ t('active') }}
+            </MenuCheckboxItem>
+            <MenuCheckboxItem
+              :model-value="countMode[c.field].includes('del')"
+              @select="$event.preventDefault()"
+              @update:model-value="toggleCountMode(c.field, 'del')"
+            >
+              {{ t('deleted') }}
+            </MenuCheckboxItem>
+          </DropdownMenu>
+        </template>
 
-:deep(.el-table .checked-row) {
-  background: var(--el-color-warning-light-9);
-}
+        <template #cell-email="{row}">
+          <ContextMenu>
+            <template #trigger>
+              <div class="flex min-w-0 items-center gap-1.5">
+                <span class="truncate text-fg">{{ row.email }}</span>
+                <!-- LinuxDo 绑定过的账号：旧版用一个 warning 色的「L」标记 -->
+                <Badge v-if="row.username" tone="warning" appearance="subtle">L</Badge>
+              </div>
+            </template>
+            <MenuItem @select="openSetPwd(row)">{{ t('changePassword') }}</MenuItem>
+            <MenuItem @select="openSetType(row)">{{ t('setRole') }}</MenuItem>
+            <MenuItem v-if="row.type !== 0" @select="onStatusAction(row)">
+              {{ statusActionLongLabel(row) }}
+            </MenuItem>
+            <MenuItem @select="openAccounts(row)">{{ t('userEmail') }}</MenuItem>
+            <MenuItem @select="openDetails(row)">{{ t('userDetails') }}</MenuItem>
+            <template v-if="canDelete && row.type !== 0">
+              <MenuSeparator />
+              <MenuItem tone="danger" @select="askDelete(row)">{{ t('adminDeleteUser') }}</MenuItem>
+            </template>
+          </ContextMenu>
+        </template>
 
-.user-box {
-  overflow: hidden;
-  height: 100%;
-}
+        <template v-for="c in COUNT_COLUMNS" #[`cell-${c.key}`]="{row}" :key="`cell-${c.key}`">
+          <span class="um-tnum">{{ countOf(row, c.field) }}</span>
+        </template>
 
-:deep(.el-dialog) {
-  width: 400px !important;
-  @media (max-width: 440px) {
-    width: calc(100% - 40px) !important;
-    margin-right: 20px !important;
-    margin-left: 20px !important;
-  }
-}
+        <template #cell-createTime="{value}">
+          <span class="um-tnum text-fg-muted">{{ formatTime(value) }}</span>
+        </template>
 
-:deep(.account-dialog) {
-  width: 500px !important;
-  @media (max-width: 540px) {
-    width: calc(100% - 40px) !important;
-    margin-right: 20px !important;
-    margin-left: 20px !important;
-  }
-}
+        <template #cell-status="{row}">
+          <Badge v-if="row.isDel === 1" tone="neutral">{{ t('deleted') }}</Badge>
+          <Badge v-else-if="row.status === 0" tone="success" appearance="subtle">{{ t('active') }}</Badge>
+          <Badge v-else tone="danger">{{ t('banned') }}</Badge>
+        </template>
 
-.header-actions {
-  padding: 9px 15px;
-  display: flex;
-  gap: 15px;
-  flex-wrap: wrap;
-  align-items: center;
-  box-shadow: var(--header-actions-border);
-  font-size: 18px;
+        <template #cell-type="{row}">
+          <span class="truncate">{{ roleName(row.type) }}</span>
+        </template>
 
-  .search-input {
-    width: min(200px, calc(100vw - 140px));
-  }
+        <!-- 超级管理员这一行，非管理员看不到菜单（旧版画的是个点不动的假按钮） -->
+        <template #cell-actions="{row}">
+          <DropdownMenu v-if="canManage(row)" align="end">
+            <template #trigger>
+              <Button variant="ghost" size="icon-sm" :label="t('ui.more')">
+                <IconEllipsis class="size-4" />
+              </Button>
+            </template>
+            <MenuItem @select="openSetPwd(row)">{{ t('changePassword') }}</MenuItem>
+            <MenuItem @select="openSetType(row)">{{ t('setRole') }}</MenuItem>
+            <MenuItem v-if="row.type !== 0" @select="onStatusAction(row)">
+              {{ statusActionLabel(row) }}
+            </MenuItem>
+            <MenuItem @select="openAccounts(row)">{{ t('userEmail') }}</MenuItem>
+            <MenuItem @select="openDetails(row)">{{ t('userDetails') }}</MenuItem>
+            <template v-if="canDelete && row.type !== 0">
+              <MenuSeparator />
+              <MenuItem tone="danger" @select="askDelete(row)">{{ t('adminDeleteUser') }}</MenuItem>
+            </template>
+          </DropdownMenu>
+        </template>
 
-  .search {
-    :deep(.el-input-group) {
-      height: 28px;
-    }
+        <template #actions="{count}">
+          <Button variant="danger" size="sm" @click="askBatchDelete">
+            <IconTrash class="size-4" />
+            {{ t('adminTable.batchDelete') }}（{{ count }}）
+          </Button>
+        </template>
 
-    :deep(.el-input__inner) {
-      height: 28px;
-    }
-  }
+        <template #empty>
+          <EmptyState
+            :icon="IconUsers"
+            :title="params.email ? t('mail.emptySearch') : t('adminTable.emptyUser')"
+            :description="params.email ? t('mail.emptySearchHint') : t('adminTable.emptyUserHint')"
+            :action-label="params.email ? '' : t('addUser')"
+            @action="openAdd"
+          />
+        </template>
 
-  .icon {
-    cursor: pointer;
-  }
-}
+        <template #error="{detail, retry}">
+          <ErrorState
+            :title="t('adminTable.loadFailed')"
+            :description="t('adminTable.loadFailedHint')"
+            :detail="detail"
+            :retry-label="t('ui.retry')"
+            :detail-label="t('adminTable.errorDetail')"
+            @retry="retry"
+          />
+        </template>
+      </DataTable>
+    </div>
 
-.container {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 15px;
-}
+    <!-- 新增用户：邮箱前缀 + 域名下拉，和注册页同一套语义 -->
+    <Dialog v-model:open="showAdd" :title="t('addUser')" size="sm">
+      <div class="grid gap-3">
+        <Field :label="t('userEmail')" required>
+          <template #default="{id, invalid}">
+            <div class="flex items-center gap-1.5">
+              <Input
+                :id="id"
+                v-model="addForm.email"
+                :invalid="invalid"
+                class="min-w-0 flex-1"
+                :placeholder="t('auth.emailPrefixPlaceholder')"
+              />
+              <Select
+                v-model="addForm.suffix"
+                :options="domainOptions"
+                class="w-40 shrink-0"
+                :aria-label="t('auth.domainSelect')"
+              />
+            </div>
+          </template>
+        </Field>
 
-.type {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
+        <Field :label="t('password')" required>
+          <template #default="{id, invalid}">
+            <Input
+              :id="id"
+              v-model="addForm.password"
+              type="password"
+              :invalid="invalid"
+              :placeholder="t('password')"
+            />
+          </template>
+        </Field>
 
-.choose-star {
-  color: var(--el-color-primary)
-}
+        <Field :label="t('role')" required>
+          <template #default="{id, invalid}">
+            <Select
+              :id="id"
+              v-model="addForm.type"
+              :invalid="invalid"
+              :options="roleOptions"
+              :placeholder="t('select')"
+            />
+          </template>
+        </Field>
+      </div>
 
-.scrollbar {
-  width: 100%;
-  overflow: auto;
-  height: calc(100% - 50px);
-  @media (max-width: 464px) {
-    height: calc(100% - 90px);
-  }
-}
+      <template #footer>
+        <Button variant="ghost" @click="showAdd = false">{{ t('cancel') }}</Button>
+        <Button variant="primary" :loading="addLoading" @click="onSubmitAdd">{{ t('add') }}</Button>
+      </template>
+    </Dialog>
 
-.details {
-  padding: 0 10px 10px 10px;
-  display: grid;
-  gap: 10px;
-  .details-item-title {
-    white-space: pre;
-    color: #909399;
-    font-weight: bold;
-    padding-right: 10px;
-  }
-}
+    <!-- 改密码 -->
+    <Dialog v-model:open="showPwd" :title="t('changePassword')" size="sm" @update:open="!$event && resetUserForm()">
+      <Field :label="t('password')" required :hint="t('adminTable.pwdHint')">
+        <template #default="{id, invalid, describedBy}">
+          <Input
+            :id="id"
+            v-model="userForm.password"
+            type="password"
+            :invalid="invalid"
+            :aria-describedby="describedBy"
+            :placeholder="t('password')"
+          />
+        </template>
+      </Field>
 
-:deep(.linuxdo-avatar) {
-  position: relative !important;
-  top: 10px;
-}
+      <template #footer>
+        <Button variant="ghost" @click="showPwd = false">{{ t('cancel') }}</Button>
+        <Button variant="primary" :loading="formLoading" @click="onSubmitPwd">{{ t('confirm') }}</Button>
+      </template>
+    </Dialog>
 
-.account-pagination {
-  display: flex;
-  justify-content: end;
-  width: 100%;
-}
+    <!-- 改身份：超级管理员不在 role 表里，只读显示 -->
+    <Dialog v-model:open="showType" :title="t('setRole')" size="sm" @update:open="!$event && resetUserForm()">
+      <Field :label="t('role')">
+        <template #default="{id}">
+          <Input v-if="userForm.type === 0" :id="id" :model-value="t('admin')" readonly />
+          <Select v-else :id="id" v-model="userForm.type" :options="roleOptions" :placeholder="t('select')" />
+        </template>
+      </Field>
 
-.pagination {
-  margin-top: 15px;
-  margin-bottom: 20px;
-  padding-right: 30px;
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  justify-content: end;
-  gap: 10px;
-  @media (max-width: 767px) {
-    padding-right: 10px;
-  }
+      <template #footer>
+        <Button variant="ghost" @click="showType = false">{{ t('cancel') }}</Button>
+        <Button
+          variant="primary"
+          :loading="formLoading"
+          :disabled="userForm.type === 0"
+          @click="onSubmitType"
+        >
+          {{ t('confirm') }}
+        </Button>
+      </template>
+    </Dialog>
 
-  .el-pagination {
-    align-self: end;
-  }
-}
+    <!-- 用户的邮箱：服务端的 total 含用户主邮箱，列表不含（account-service.allAccount） -->
+    <Dialog v-model:open="showAccounts" :title="t('userEmail')" size="md">
+      <DataTable
+        :columns="accountColumns"
+        :rows="accountRows"
+        row-key="accountId"
+        :aria-label="t('userEmail')"
+        :loading="accountLoading"
+        :error="accountErrorDetail"
+        :skeleton-rows="3"
+        :page="accountParams.num"
+        :page-size="accountParams.size"
+        :total="accountParams.total"
+        scroll-class="max-h-80"
+        @update:page="setAccountPage"
+        @retry="openAccountList(accountParams.userId)"
+      >
+        <template #cell-actions="{row}">
+          <Button
+            v-perm="'email:delete'"
+            variant="ghost"
+            size="icon-sm"
+            :label="t('delete')"
+            @click="askDeleteAccount(row)"
+          >
+            <IconTrash class="size-4" />
+          </Button>
+        </template>
+        <template #empty>
+          <EmptyState :icon="IconMailbox" :title="t('adminTable.emptyAccount')" />
+        </template>
+        <template #error="{detail, retry}">
+          <ErrorState
+            :title="t('adminTable.loadFailed')"
+            :detail="detail"
+            :retry-label="t('ui.retry')"
+            :detail-label="t('adminTable.errorDetail')"
+            @retry="retry"
+          />
+        </template>
+      </DataTable>
+    </Dialog>
 
+    <!-- 用户详情：不再按屏宽补漏，永远显示全部字段 -->
+    <Dialog v-model:open="showDetails" :title="t('userDetails')" size="md">
+      <dl v-if="details" class="grid gap-x-4 gap-y-2 text-sm sm:grid-cols-[auto_1fr]">
+        <template v-if="details.username">
+          <dt class="text-fg-muted">LinuxDo</dt>
+          <dd class="flex items-center gap-2">
+            <Avatar :src="details.avatar" :name="details.username" size="sm" />
+            <span class="truncate text-fg">{{ details.username }}</span>
+            <Badge tone="success" appearance="subtle">{{ t('trustLevel') }} {{ details.trustLevel }}</Badge>
+          </dd>
+        </template>
 
-.email-row {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
+        <dt class="text-fg-muted">{{ t('userEmail') }}</dt>
+        <dd class="truncate text-fg">{{ details.email }}</dd>
 
-.status-select {
-  :deep(.el-select__wrapper) {
-    min-height: 28px;
-  }
-}
+        <dt class="text-fg-muted">{{ t('perm') }}</dt>
+        <dd class="text-fg">{{ roleName(details.type) }}</dd>
 
-.dialog {
-  .dialog-box {
-    .el-button {
-      width: 100%;
-      margin-top: 15px;
-    }
-  }
-}
+        <dt class="text-fg-muted">{{ t('tabStatus') }}</dt>
+        <dd>
+          <Badge v-if="details.isDel === 1" tone="neutral">{{ t('deleted') }}</Badge>
+          <Badge v-else-if="details.status === 0" tone="success" appearance="subtle">{{ t('active') }}</Badge>
+          <Badge v-else tone="danger">{{ t('banned') }}</Badge>
+        </dd>
 
-.select {
-  position: absolute;
-  right: 30px;
-  width: 100px;
-  opacity: 0;
-  pointer-events: none;
-}
+        <dt class="text-fg-muted">{{ t('tabReceived') }}</dt>
+        <dd class="um-tnum text-fg">{{ countOf(details, 'receive') }}</dd>
 
-.loading {
-  position: absolute;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background-color: var(--loadding-background);
-  left: 0;
-  z-index: 2;
-  top: 0;
-  width: 100%;
-  height: 100%;
-}
+        <dt class="text-fg-muted">{{ t('tabSent') }}</dt>
+        <dd class="um-tnum text-fg">{{ countOf(details, 'send') }}</dd>
 
-.loading-show {
-  transition: all 200ms ease 200ms;
-  opacity: 1;
-}
+        <dt class="text-fg-muted">{{ t('tabMailboxes') }}</dt>
+        <dd class="um-tnum text-fg">{{ countOf(details, 'account') }}</dd>
 
-.loading-hide {
-  pointer-events: none;
-  transition: var(--loading-hide-transition);
-  opacity: 0;
-}
+        <dt class="text-fg-muted">{{ t('tabRegisteredAt') }}</dt>
+        <dd class="um-tnum text-fg">{{ formatTime(details.createTime) }}</dd>
 
-.setting-icon {
-  position: relative;
-  top: 6px;
-}
+        <dt class="text-fg-muted">{{ t('registrationIp') }}</dt>
+        <dd class="um-tnum text-fg">{{ details.createIp || t('unknown') }}</dd>
 
-.right-dropdown-item {
-  display: flex;
-  gap: 10px;
-}
+        <dt class="text-fg-muted">{{ t('recentIP') }}</dt>
+        <dd class="um-tnum text-fg">{{ details.activeIp || t('unknown') }}</dd>
 
-.btn {
-  width: 100%;
-}
+        <dt class="text-fg-muted">{{ t('recentActivity') }}</dt>
+        <dd class="um-tnum text-fg">
+          {{ details.activeTime ? formatTime(details.activeTime, 'YYYY-MM-DD') : t('unknown') }}
+        </dd>
 
-:deep(.el-pagination .el-select) {
-  width: 100px;
-  background: var(--el-bg-color);
-}
+        <dt class="text-fg-muted">{{ t('loginDevice') }}</dt>
+        <dd class="text-fg">{{ details.device || t('unknown') }}</dd>
 
-:deep(.el-input-group__append) {
-  padding: 0 !important;
-  padding-left: 8px !important;
-  background: var(--el-bg-color);
-}
+        <dt class="text-fg-muted">{{ t('loginSystem') }}</dt>
+        <dd class="text-fg">{{ details.os || t('unknown') }}</dd>
 
-:deep(.cell) {
-  white-space: normal;
-  overflow: visible;
-  text-overflow: clip;
-}
+        <dt class="text-fg-muted">{{ t('browserLogin') }}</dt>
+        <dd class="text-fg">{{ details.browser || t('unknown') }}</dd>
 
-:deep(.receive .cell) {
-  white-space: nowrap;
-}
+        <dt class="text-fg-muted">{{ t('sendEmail') }}</dt>
+        <dd class="flex flex-wrap items-center gap-2">
+          <span class="um-tnum text-fg">{{ sendCountText(details) }}</span>
+          <Badge v-if="details.sendAction?.hasPerm" appearance="subtle">{{ sendTypeText(details) }}</Badge>
+          <Button
+            v-if="details.sendAction?.hasPerm && details.sendAction?.sendCount"
+            variant="secondary"
+            size="sm"
+            @click="resetSendCount(details)"
+          >
+            {{ t('reset') }}
+          </Button>
+        </dd>
+      </dl>
+    </Dialog>
 
-:deep(.send .cell) {
-  white-space: nowrap;
-}
-
-:deep(.account .cell) {
-  white-space: nowrap;
-}
-
-:deep(.el-table) {
-  @media (pointer: coarse) {
-    /* 触屏 */
-    user-select: none;
-  }
-}
-
-:deep(.el-table th.el-table__cell>.cell.highlight) {
-  color: #909399;
-}
-
-:deep(.el-table__inner-wrapper:before) {
-  background: var(--el-bg-color);
-}
-
-:deep(.el-message-box__container) {
-  align-items: start;
-}
-</style>
+    <!-- 删除 / 封禁 / 恢复：替代 ElMessageBox.confirm，焦点默认落在「取消」 -->
+    <AlertDialog
+      v-model:open="confirmOpen"
+      :title="confirmData.title"
+      :description="confirmData.description"
+      :confirm-text="confirmData.confirmText"
+      :cancel-text="t('cancel')"
+      :tone="confirmData.tone"
+      :loading="confirmLoading"
+      @confirm="runConfirm"
+    />
+  </div>
+</template>

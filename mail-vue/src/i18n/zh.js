@@ -535,7 +535,7 @@ const zh = {
     },
     /* 管理域表格页（§7.9 / §10.4）。旧页面已有的文案（noCodeFound / delSuccessMsg /
        add / delete …）继续用顶层键，这里只放 DataTable 迁移新增的部分。 */
-    admin: {
+    adminTable: {
         /* 四态：DataTable 的 #error / #empty 插槽用 */
         loadFailed: '数据没能加载出来',
         loadFailedHint: '可能是网络断了。重试一次通常就好。',

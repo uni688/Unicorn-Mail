@@ -58,7 +58,7 @@ const columns = computed(() => [
     {key: 'name', label: t('role'), minWidth: '160px', truncate: true},
     {key: 'sort', label: t('order'), width: '90px', align: 'end'},
     {key: 'description', label: t('description'), minWidth: '180px', truncate: true},
-    {key: 'actions', label: t('admin.actions'), width: '68px', align: 'end', cardHidden: true},
+    {key: 'actions', label: t('adminTable.actions'), width: '68px', align: 'end', cardHidden: true},
 ])
 
 async function getList() {
@@ -239,7 +239,7 @@ const confirmData = ref({title: '', description: '', confirmText: '', tone: 'dan
 function askDelete(role) {
     confirmData.value = {
         title: t('delConfirm', {msg: role.name}),
-        description: t('admin.delRoleHint'),
+        description: t('adminTable.delRoleHint'),
         confirmText: t('delete'),
         tone: 'danger',
         run: async () => {
@@ -254,8 +254,8 @@ function askDelete(role) {
 
 function askSetDefault(role) {
     confirmData.value = {
-        title: t('admin.setDefaultConfirm', {msg: role.name}),
-        description: t('admin.setDefaultHint'),
+        title: t('adminTable.setDefaultConfirm', {msg: role.name}),
+        description: t('adminTable.setDefaultHint'),
         confirmText: t('confirm'),
         tone: 'default',
         run: async () => {
@@ -325,7 +325,7 @@ async function runConfirm() {
             </template>
             <MenuItem v-if="canSet" @select="openEdit(row)">{{ t('change') }}</MenuItem>
             <MenuItem v-if="canSet && !row.isDefault" @select="askSetDefault(row)">
-              {{ t('admin.setDefault') }}
+              {{ t('adminTable.setDefault') }}
             </MenuItem>
             <template v-if="canDelete && !row.isDefault">
               <MenuSeparator />
@@ -337,8 +337,8 @@ async function runConfirm() {
         <template #empty>
           <EmptyState
             :icon="IconShield"
-            :title="t('admin.emptyRole')"
-            :description="t('admin.emptyRoleHint')"
+            :title="t('adminTable.emptyRole')"
+            :description="t('adminTable.emptyRoleHint')"
             :action-label="t('addRoleTitle')"
             @action="openAdd"
           />
@@ -346,11 +346,11 @@ async function runConfirm() {
 
         <template #error="{detail, retry}">
           <ErrorState
-            :title="t('admin.loadFailed')"
-            :description="t('admin.loadFailedHint')"
+            :title="t('adminTable.loadFailed')"
+            :description="t('adminTable.loadFailedHint')"
             :detail="detail"
             :retry-label="t('ui.retry')"
-            :detail-label="t('admin.errorDetail')"
+            :detail-label="t('adminTable.errorDetail')"
             @retry="retry"
           />
         </template>
@@ -392,7 +392,7 @@ async function runConfirm() {
               <Input :id="id" v-model="form.name" :invalid="invalid" :maxlength="12" />
             </template>
           </Field>
-          <Field :label="t('order')" :hint="t('admin.sortHint')">
+          <Field :label="t('order')" :hint="t('adminTable.sortHint')">
             <template #default="{id}">
               <NumberInput :id="id" v-model="form.sort" :min="0" :max="9999" />
             </template>
@@ -405,26 +405,26 @@ async function runConfirm() {
           </template>
         </Field>
 
-        <Field :label="t('emailInterception')" optional :hint="t('admin.banEmailHint')">
+        <Field :label="t('emailInterception')" optional :hint="t('adminTable.banEmailHint')">
           <template #default="{id}">
             <TagsInput
               :id="id"
               :model-value="form.banEmail"
               :delimiter="/[,，]/"
-              :placeholder="t('admin.banEmailPlaceholder')"
+              :placeholder="t('adminTable.banEmailPlaceholder')"
               @update:model-value="onBanEmailUpdate"
             />
           </template>
         </Field>
 
-        <Field :label="t('availableDomains')" optional :hint="t('admin.availDomainHint')">
+        <Field :label="t('availableDomains')" optional :hint="t('adminTable.availDomainHint')">
           <template #default="{id}">
             <Select
               :id="id"
               v-model="form.availDomain"
               multiple
               :options="domainOptions"
-              :placeholder="t('admin.availDomainAll')"
+              :placeholder="t('adminTable.availDomainAll')"
             />
           </template>
         </Field>
@@ -469,7 +469,7 @@ async function runConfirm() {
                     :options="sendTypeOptions"
                     size="sm"
                     class="w-24"
-                    :aria-label="t('admin.sendType')"
+                    :aria-label="t('adminTable.sendType')"
                   />
                 </span>
 

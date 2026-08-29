@@ -1,8 +1,12 @@
 import http from '@/axios/index.js'
 
 
-export function userList(params) {
-    return http.get('/user/list', {params: {...params}})
+/**
+ * 列表与邮箱列表多带一个 `config`：管理页把失败画进 DataTable 的 error 态，
+ * 需要 `noMsg: true` 让拦截器别再弹一次 toast（见 `axios/index.js`）。
+ */
+export function userList(params, config = {}) {
+    return http.get('/user/list', {...config, params: {...params}})
 }
 
 export function userSetPwd(params) {
@@ -34,8 +38,8 @@ export function userRestore(userId,type) {
     return http.put('/user/restore', {userId,type})
 }
 
-export function userAllAccount(userId, num, size) {
-    return http.get('/user/allAccount', {params:{userId,num,size}})
+export function userAllAccount(userId, num, size, config = {}) {
+    return http.get('/user/allAccount', {...config, params: {userId, num, size}})
 }
 
 export function userDeleteAccount(accountId) {

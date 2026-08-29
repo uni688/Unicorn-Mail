@@ -62,7 +62,7 @@ const columns = computed(() => [
     {key: 'roleName', label: t('roleDesc'), width: '140px'},
     {key: 'count', label: t('remainingUses'), width: '120px', align: 'end', sortable: true},
     {key: 'expireTime', label: t('validUntil'), width: '150px', sortable: true},
-    {key: 'actions', label: t('admin.actions'), width: '68px', align: 'end', cardHidden: true},
+    {key: 'actions', label: t('adminTable.actions'), width: '68px', align: 'end', cardHidden: true},
 ])
 
 /** 默认不排序：服务端已经按 regKeyId 倒序给了，也就是「最近建的在上」 */
@@ -243,7 +243,7 @@ function askDelete(row) {
 function askBatchDelete() {
     const ids = [...selection.ids.value]
     ask({
-        title: t('admin.delRegKeysConfirm', {n: ids.length}),
+        title: t('adminTable.delRegKeysConfirm', {n: ids.length}),
         confirmText: t('delete'),
         run: () => regKeyDelete(ids).then(() => toast.success(t('delSuccessMsg'))),
     })
@@ -336,7 +336,7 @@ function openHistory(row) {
           v-perm="'reg-key:delete'"
           variant="ghost"
           size="icon-sm"
-          :label="t('admin.clearInvalid')"
+          :label="t('adminTable.clearInvalid')"
           @click="askClearNotUse"
         >
           <IconEraser class="size-4" />
@@ -362,7 +362,7 @@ function openHistory(row) {
         <template #cell-code="{value}">
           <div class="flex min-w-0 items-center gap-1">
             <span class="truncate font-mono text-mono text-fg">{{ value }}</span>
-            <CopyButton :value="value" :label="$t('admin.copyCode')" />
+            <CopyButton :value="value" :label="$t('adminTable.copyCode')" />
           </div>
         </template>
 
@@ -400,15 +400,15 @@ function openHistory(row) {
         <!-- 批量删除：`regKeyDelete()` 本来就收数组 -->
         <template #actions="{count}">
           <Button variant="danger" size="sm" @click="askBatchDelete">
-            {{ t('admin.batchDelete') }}（{{ count }}）
+            {{ t('adminTable.batchDelete') }}（{{ count }}）
           </Button>
         </template>
 
         <template #empty>
           <EmptyState
             :icon="IconKey"
-            :title="params.code ? t('mail.emptySearch') : t('admin.emptyRegKey')"
-            :description="params.code ? t('mail.emptySearchHint') : t('admin.emptyRegKeyHint')"
+            :title="params.code ? t('mail.emptySearch') : t('adminTable.emptyRegKey')"
+            :description="params.code ? t('mail.emptySearchHint') : t('adminTable.emptyRegKeyHint')"
             :action-label="params.code ? '' : t('addRegKey')"
             @action="openAdd"
           />
@@ -416,11 +416,11 @@ function openHistory(row) {
 
         <template #error="{detail, retry}">
           <ErrorState
-            :title="t('admin.loadFailed')"
-            :description="t('admin.loadFailedHint')"
+            :title="t('adminTable.loadFailed')"
+            :description="t('adminTable.loadFailedHint')"
             :detail="detail"
             :retry-label="t('ui.retry')"
-            :detail-label="t('admin.errorDetail')"
+            :detail-label="t('adminTable.errorDetail')"
             @retry="retry"
           />
         </template>
@@ -444,7 +444,7 @@ function openHistory(row) {
                 class="min-w-0 flex-1"
                 :placeholder="t('regKey')"
               />
-              <Button variant="secondary" size="icon" :label="t('admin.regenerate')" @click="genCode">
+              <Button variant="secondary" size="icon" :label="t('adminTable.regenerate')" @click="genCode">
                 <IconShuffle class="size-4" />
               </Button>
             </div>
@@ -507,14 +507,14 @@ function openHistory(row) {
         @retry="loadHistory"
       >
         <template #empty>
-          <EmptyState :icon="IconUser" :title="t('admin.historyEmpty')" />
+          <EmptyState :icon="IconUser" :title="t('adminTable.historyEmpty')" />
         </template>
         <template #error="{detail, retry}">
           <ErrorState
-            :title="t('admin.loadFailed')"
+            :title="t('adminTable.loadFailed')"
             :detail="detail"
             :retry-label="t('ui.retry')"
-            :detail-label="t('admin.errorDetail')"
+            :detail-label="t('adminTable.errorDetail')"
             @retry="retry"
           />
         </template>

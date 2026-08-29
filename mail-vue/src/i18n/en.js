@@ -531,7 +531,7 @@ const en = {
     },
     /* Admin table pages (§7.9 / §10.4). Copy the legacy pages already had
        (noCodeFound / delSuccessMsg / add / delete …) keeps its top-level keys. */
-    admin: {
+    adminTable: {
         /* Four states: used by DataTable's #error / #empty slots */
         loadFailed: 'Could not load the data',
         loadFailedHint: 'The network may be down. A retry usually fixes it.',
