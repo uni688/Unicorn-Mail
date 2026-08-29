@@ -66,6 +66,19 @@ const en = {
 	notAdmin: 'The entered email is not an administrator email',
 	emailExistDatabase: 'Email already exists in the database',
 	notConfigOss: 'Object storage not configured',
+	// P4（§5.3.5）：开放 API 的 Key 与鉴权文案
+	emptyApiKeyName: 'Key name cannot be empty',
+	apiKeyNameLengthLimit: 'Key name length exceeds the limit',
+	emptyApiKeyScope: 'Select at least one scope',
+	apiKeyLimit: 'API key limit reached',
+	apiKeyStatusIllegal: 'Invalid key status',
+	notExistApiKey: 'API key does not exist',
+	apiKeyMissing: 'Missing Authorization header',
+	apiKeyMalformed: 'Authorization header must be "Bearer <key>"',
+	apiKeyInvalid: 'Invalid API key',
+	apiKeyDisabled: 'API key is disabled',
+	apiKeyExpired: 'API key has expired',
+	apiKeyScopeDenied: 'API key is missing the required scope',
 	perms: {
 		"邮件": "Emails",
 		"邮件发送": "Send Email",
@@ -99,7 +112,14 @@ const en = {
 		"系统设置": "System Settings",
 		"设置查看": "View Settings",
 		"设置修改": "Change Settings",
-		"发件重置": "Reset Send Count"
+		"发件重置": "Reset Send Count",
+		// P4（§5.3.5）：开发者中心。这里的 key 必须与 init.js v3_2DB() 里 perm.name 完全一致
+		"开发者": "Developer",
+		"API密钥查看": "View API Key",
+		"API密钥创建": "Create API Key",
+		"API密钥修改": "Change API Key",
+		"API密钥删除": "Delete API Key",
+		"请求日志查看": "View API Log"
 	}
 };
 

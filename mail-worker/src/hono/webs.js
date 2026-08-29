@@ -20,4 +20,7 @@ import '../api/reg-key-api'
 import '../api/public-api'
 import '../api/telegram-api'
 import '../api/oauth-api'
+// P4（§5.3.5）：开发者中心的后台接口，走登录态 + 权限键
+import '../api/api-key-api'
+import '../api/api-log-api'
 export default app;

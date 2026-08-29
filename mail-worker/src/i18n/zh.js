@@ -66,6 +66,19 @@ const zh = {
 	notAdmin: '输入的邮箱不是管理员邮箱',
 	emailExistDatabase: '有邮箱已存在数据库中',
 	notConfigOss: '对象存储未配置',
+	// P4（§5.3.5）：开放 API 的 Key 与鉴权文案
+	emptyApiKeyName: '密钥名称不能为空',
+	apiKeyNameLengthLimit: '密钥名称长度超出限制',
+	emptyApiKeyScope: '至少选择一个权限范围',
+	apiKeyLimit: '密钥数量到达限制',
+	apiKeyStatusIllegal: '非法的密钥状态',
+	notExistApiKey: '密钥不存在',
+	apiKeyMissing: '缺少 Authorization 请求头',
+	apiKeyMalformed: 'Authorization 格式应为 Bearer <key>',
+	apiKeyInvalid: '密钥无效',
+	apiKeyDisabled: '密钥已停用',
+	apiKeyExpired: '密钥已过期',
+	apiKeyScopeDenied: '密钥没有该接口的权限范围',
 	perms: {
 		"邮件": "邮件",
 		"邮件发送": "邮件发送",
@@ -99,7 +112,14 @@ const zh = {
 		"系统设置": "系统设置",
 		"设置查看": "设置查看",
 		"设置修改": "设置修改",
-		'发件重置': '发件重置'
+		'发件重置': '发件重置',
+		// P4（§5.3.5）：开发者中心。这里的 key 必须与 init.js v3_2DB() 里 perm.name 完全一致
+		"开发者": "开发者",
+		"API密钥查看": "API密钥查看",
+		"API密钥创建": "API密钥创建",
+		"API密钥修改": "API密钥修改",
+		"API密钥删除": "API密钥删除",
+		"请求日志查看": "请求日志查看"
 	}
 }
 

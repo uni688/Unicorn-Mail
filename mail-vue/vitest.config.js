@@ -64,6 +64,11 @@ export default defineConfig({
                     root: fileURLToPath(new URL('../mail-worker', import.meta.url)),
                     environment: 'node',
                     include: ['test/**/*.node.spec.js'],
+                    // 每个文件的**第一个** setupEnv() 要跑完整条真迁移链（v1_1 → v3_2，几十条
+                    // DDL），实测 5–8s；同文件后续用例复用已 transform 的模块，只要 10–20ms。
+                    // 默认 5s 会让「第一个用例」随文件数增加而随机超时 —— 那是调度噪声，
+                    // 不是被测行为，所以这里放宽到 30s 而不是去拆 setupEnv 的缓存。
+                    testTimeout: 30000,
                 },
             },
         ],

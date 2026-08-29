@@ -31,8 +31,118 @@ const dbInit = {
 		await this.v2_10DB(c);
 		await this.v3_0DB(c);
 		await this.v3_1DB(c);
+		await this.v3_2DB(c);
 		await settingService.refresh(c);
 		return c.text('success');
+	},
+
+	/**
+	 * P4（§10.5 / §4.5）：开放 API 的两张新表 + 对应的权限行。
+	 *
+	 * 幂等靠三件事，连跑两次不报错（`test/api-init.node.spec.js` 直接验这一点）：
+	 *   1. 只用 `CREATE TABLE IF NOT EXISTS` / `CREATE INDEX IF NOT EXISTS`，不 DROP、不改存量行；
+	 *   2. perm 行的 `INSERT` 用 `WHERE NOT EXISTS`（`perm_id` 是硬编码主键，直接 INSERT
+	 *      第二次会撞唯一约束；外面那层 try/catch 虽然吞得住，但会在日志里刷一条假告警）；
+	 *   3. 每段各自 try/catch，一段失败不拖累后面的。
+	 *
+	 * `perm_id` 从 **37** 起（现已占用 1–19、21–36）。`name` 是中文字面量，与既有行一致
+	 * —— 这张表没有 i18n 列，翻译在 `i18n/{zh,en}.js` 的 `perms` 字典里按 name 查。
+	 *
+	 * 权限点的语义见 §0.9：Key/日志的数据隔离由 service 层的 `eq(userId, …)` 保证，
+	 * 这几个 perm 是「允许这个角色使用开放 API 能力」的功能开关，默认只给管理员
+	 * （不写 `role_perm`，即除 `env.admin` 逃逸口外默认无人可用，站长自己去角色页勾）。
+	 */
+	async v3_2DB(c) {
+
+		try {
+			await c.env.db.prepare(`
+			  CREATE TABLE IF NOT EXISTS api_key (
+				key_id INTEGER PRIMARY KEY AUTOINCREMENT,
+				user_id INTEGER NOT NULL,
+				name TEXT NOT NULL,
+				prefix TEXT NOT NULL,
+				hash TEXT NOT NULL,
+				salt TEXT NOT NULL,
+				scopes TEXT NOT NULL DEFAULT '',
+				status INTEGER NOT NULL DEFAULT 0,
+				expire_time DATETIME,
+				last_used_time DATETIME,
+				create_time DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL,
+				is_del INTEGER NOT NULL DEFAULT 0
+			  )
+			`).run();
+		} catch (e) {
+			console.warn(`跳过建表：${e.message}`);
+		}
+
+		try {
+			await c.env.db.prepare(`
+			  CREATE TABLE IF NOT EXISTS api_log (
+				log_id INTEGER PRIMARY KEY AUTOINCREMENT,
+				key_id INTEGER,
+				user_id INTEGER,
+				method TEXT NOT NULL,
+				path TEXT NOT NULL,
+				status INTEGER NOT NULL,
+				duration INTEGER NOT NULL,
+				ip TEXT,
+				ua TEXT,
+				err TEXT,
+				create_time DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL
+			  )
+			`).run();
+		} catch (e) {
+			console.warn(`跳过建表：${e.message}`);
+		}
+
+		const INDEX_SQL_LIST = [
+			`CREATE INDEX IF NOT EXISTS idx_api_key_user ON api_key(user_id, is_del)`,
+			`CREATE UNIQUE INDEX IF NOT EXISTS idx_api_key_prefix ON api_key(prefix)`,
+			`CREATE INDEX IF NOT EXISTS idx_api_log_time ON api_log(create_time DESC)`,
+			`CREATE INDEX IF NOT EXISTS idx_api_log_key ON api_log(key_id, create_time DESC)`,
+			// 日志列表恒定带 user_id 谓词 + 按 log_id 倒序游标，这一条是它的覆盖索引
+			`CREATE INDEX IF NOT EXISTS idx_api_log_user ON api_log(user_id, log_id DESC)`
+		];
+
+		for (const sql of INDEX_SQL_LIST) {
+			try {
+				await c.env.db.prepare(sql).run();
+			} catch (e) {
+				console.warn(`跳过创建索引：${e.message}`);
+			}
+		}
+
+		try {
+			await c.env.db.prepare(`
+        INSERT INTO perm (perm_id, name, perm_key, pid, type, sort)
+        SELECT 37,'开发者', NULL, 0, 1, 6.1
+        WHERE NOT EXISTS (SELECT 1 FROM perm WHERE perm_id = 37)`).run();
+		} catch (e) {
+			console.warn(`跳过数据：${e.message}`);
+		}
+
+		// `name` 必须与既有行**不重名**：`perms` 翻译字典是按 name 查的，
+		// reg-key 已经占了「密钥查看 / 密钥添加 / 密钥删除」（perm_id 34–36，译作 View/Add/Delete Code），
+		// 这里叫同一个名字会让 API 密钥的权限点显示成邀请码的文案
+		const PERM_SQL_LIST = [
+			[38, 'API密钥查看', 'api-key:query', 0],
+			[39, 'API密钥创建', 'api-key:add', 1],
+			[40, 'API密钥修改', 'api-key:set', 2],
+			[41, 'API密钥删除', 'api-key:delete', 3],
+			[42, '请求日志查看', 'api-log:query', 4]
+		];
+
+		for (const [permId, name, permKey, sort] of PERM_SQL_LIST) {
+			try {
+				await c.env.db.prepare(`
+          INSERT INTO perm (perm_id, name, perm_key, pid, type, sort)
+          SELECT ?, ?, ?, 37, 2, ?
+          WHERE NOT EXISTS (SELECT 1 FROM perm WHERE perm_id = ?)`)
+					.bind(permId, name, permKey, sort, permId).run();
+			} catch (e) {
+				console.warn(`跳过数据：${e.message}`);
+			}
+		}
 	},
 
 	/**

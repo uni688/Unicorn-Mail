@@ -63,7 +63,18 @@ const requirePerms = [
 	'/regKey/list',
 	'/regKey/delete',
 	'/regKey/clearNotUse',
-	'/regKey/history'
+	'/regKey/history',
+	// P4（§5.3.5）：开发者中心。注意这些是「管理自己的 Key」的后台接口，
+	// 走的是登录态 + 权限键；用 Key 调的开放接口在 /open/*，不在这里，见 api-key-auth.js
+	'/apiKey/add',
+	'/apiKey/list',
+	'/apiKey/setStatus',
+	'/apiKey/delete',
+	'/apiKey/usage',
+	// 作用域清单是静态表，但仍然要登录才能看：它等于把开放接口的路径全列出来
+	'/apiKey/scopes',
+	'/apiLog/list',
+	'/apiLog/keys'
 ];
 
 const premKey = {
@@ -92,6 +103,14 @@ const premKey = {
 	'reg-key:add': ['/regKey/add'],
 	'reg-key:query': ['/regKey/list','/regKey/history'],
 	'reg-key:delete': ['/regKey/delete','/regKey/clearNotUse'],
+	// P4（§5.3.5）：/apiKey/scopes 同时挂在 query 和 add 下 —— permKeyToPaths 是把
+	// 用户所有权限键的路径并成一张表再查，两边都写等于「有任一个键就能读作用域清单」，
+	// 否则只给了创建权限的角色打不开创建弹窗
+	'api-key:query': ['/apiKey/list', '/apiKey/usage', '/apiKey/scopes'],
+	'api-key:add': ['/apiKey/add', '/apiKey/scopes'],
+	'api-key:set': ['/apiKey/setStatus'],
+	'api-key:delete': ['/apiKey/delete'],
+	'api-log:query': ['/apiLog/list', '/apiLog/keys'],
 };
 
 app.use('*', async (c, next) => {
