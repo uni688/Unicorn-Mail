@@ -6,6 +6,7 @@ import emailService from './service/email-service';
 import r2Service from './service/r2-service';
 import oauthService from "./service/oauth-service";
 import analysisService from './service/analysis-service';
+import apiLogService from './service/api-log-service';
 export default {
 	 async fetch(req, env, ctx) {
 
@@ -33,5 +34,8 @@ export default {
 		// P3 增量 2（决策 9）：回收站满 30 天的邮件物理删除。放在最后，且方法内部自带
 		// try/catch —— 清不了回收站不该影响上面几个日常任务
 		await emailService.clearTrash({ env })
+		// P4（§4.5）：api_log 只留 30 天。同样自带 try/catch，且排在最后一位 ——
+		// 没跑过 v3_2DB() 的库上 api_log 还不存在，那种情况下要安静跳过而不是让整个 cron 挂掉
+		await apiLogService.clearExpired({ env })
 	},
 };

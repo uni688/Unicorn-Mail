@@ -79,6 +79,7 @@ const en = {
 	apiKeyDisabled: 'API key is disabled',
 	apiKeyExpired: 'API key has expired',
 	apiKeyScopeDenied: 'API key is missing the required scope',
+	apiPathNotFound: 'API endpoint does not exist',
 	perms: {
 		"邮件": "Emails",
 		"邮件发送": "Send Email",

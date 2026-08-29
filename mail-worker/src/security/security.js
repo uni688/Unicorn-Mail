@@ -18,7 +18,11 @@ const exclude = [
 	'/public/genToken',
 	'/telegram',
 	'/test',
-	'/oauth'
+	'/oauth',
+	// P4（§0.10）：开放 API 用 `Authorization: Bearer um_live_…`，没有 TOKEN_HEADER 的 JWT，
+	// 留在这个中间件里必定 401。它的鉴权在 `security/api-key-auth.js`，
+	// 那个中间件的 import 排在本文件之后（见 hono/webs.js），所以 /open/* 不是「无鉴权」
+	'/open'
 ];
 
 const requirePerms = [

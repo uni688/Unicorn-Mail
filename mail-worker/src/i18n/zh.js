@@ -79,6 +79,7 @@ const zh = {
 	apiKeyDisabled: '密钥已停用',
 	apiKeyExpired: '密钥已过期',
 	apiKeyScopeDenied: '密钥没有该接口的权限范围',
+	apiPathNotFound: '接口不存在',
 	perms: {
 		"邮件": "邮件",
 		"邮件发送": "邮件发送",
