@@ -1,13 +1,12 @@
 <template>
   <div class="email-container">
     <div class="header-actions">
-      <el-checkbox
-          v-model="checkAll"
-          :indeterminate="isIndeterminate"
+      <Checkbox
+          :model-value="isIndeterminate ? 'indeterminate' : checkAll"
           :disabled="!emailList.length || loading"
-          @change="handleCheckAllChange"
-      >
-      </el-checkbox>
+          :aria-label="t('shell.selectAll')"
+          @update:model-value="handleCheckAllChange"
+      />
       <div class="header-left" :style="'padding-left:' + actionLeft">
 
         <slot name="first"></slot>
@@ -37,79 +36,130 @@
                         :key="keyCount"
         >
           <template #default="{ data: item, index }" >
-            <div :class="'email-row ' + props.type"
-                 :data-checked="item.checked"
-                 @click="jumpDetails(item)"
-                 v-if="!item.expand"
-                 :key="item.emailId"
-                 @contextmenu="handleContextmenu($event, item)"
-                 :style="item.rightChecked ? 'background: #FDF6EC' : ''"
+            <!-- P4\uFF1A\u53F3\u952E\u83DC\u5355\u4ECE\u300C\u4E00\u4E2A\u5168\u5C40 el-dropdown + \u865A\u62DF ref \u8DDF\u7740\u5149\u6807\u8DD1\u300D\u6539\u6210\u6BCF\u884C\u4E00\u4E2A
+                 L1 ContextMenu\u3002reka \u7684 Trigger \u662F as-child\uFF0C\u4E0D\u4F1A\u591A\u5305\u5143\u7D20\uFF0C\u865A\u62DF\u5217\u8868\u5E03\u5C40\u4E0D\u53D8\u3002 -->
+            <ContextMenu
+                v-if="!item.expand"
+                :key="item.emailId"
+                :disabled="props.type === 'draft'"
+                @update:open="onContextOpen(item, $event)"
             >
-              <el-checkbox :class=" props.type === 'all-email' ? 'all-email-checkbox' : 'checkbox'"
-                           v-model="item.checked" @click.stop></el-checkbox>
-              <div @click.stop="starChange(item)" class="pc-star" v-if="showStar">
-                <Icon v-if="item.isStar" icon="fluent-color:star-16" width="20" height="20"/>
-                <Icon v-else icon="solar:star-line-duotone" width="18" height="18"/>
-              </div>
-              <div v-if="!showStar"></div>
-              <div class="title" :class="accountShow ? 'title-column' : 'title-column'">
+              <template #trigger>
+                <div :class="['email-row', props.type, {'email-row-context': item.rightChecked}]"
+                     :data-checked="item.checked"
+                     @click="jumpDetails(item)"
+                >
+                  <Checkbox :class="props.type === 'all-email' ? 'all-email-checkbox' : 'checkbox'"
+                            :model-value="item.checked"
+                            :aria-label="t('shell.selectOne')"
+                            @update:model-value="item.checked = $event"
+                            @click.stop/>
+                  <div @click.stop="starChange(item)" class="pc-star" v-if="showStar">
+                    <Icon v-if="item.isStar" icon="fluent-color:star-16" width="20" height="20"/>
+                    <Icon v-else icon="solar:star-line-duotone" width="18" height="18"/>
+                  </div>
+                  <div v-if="!showStar"></div>
+                  <div class="title title-column">
 
-                <div class="email-sender" :style=" (showStatus ? 'gap: 10px;' : '') + ((item.unread === EmailUnreadEnum.UNREAD && showUnread)  ? 'font-weight: bold' : '')">
-                  <div class="email-status" v-if="showStatus">
-                    <el-tooltip effect="dark" :content="item.statusIcon.content">
-                      <Icon :icon="item.statusIcon.icon" :style="`color: ${item.statusIcon.color}`" width="20" height="20"/>
-                    </el-tooltip>
-                    <div class="del-status" v-if="item.isDel">
-                      <el-tooltip effect="dark" :content="item.isDelContent">
-                        <Icon class="icon" icon="mdi:email-remove" width="20" height="20"/>
-                      </el-tooltip>
+                    <div class="email-sender" :style=" (showStatus ? 'gap: 10px;' : '') + ((item.unread === EmailUnreadEnum.UNREAD && showUnread)  ? 'font-weight: bold' : '')">
+                      <div class="email-status" v-if="showStatus">
+                        <Tooltip :text="item.statusIcon.content">
+                          <Icon :icon="item.statusIcon.icon" :style="{color: item.statusIcon.color}" width="20" height="20"/>
+                        </Tooltip>
+                        <div class="del-status" v-if="item.isDel">
+                          <Tooltip :text="item.isDelContent">
+                            <Icon class="icon" icon="mdi:email-remove" width="20" height="20"/>
+                          </Tooltip>
+                        </div>
+                      </div>
+                      <div v-else></div>
+                      <span class="name">
+                        <span>
+                          <div class="unread" v-if="isMobile && (item.unread === EmailUnreadEnum.UNREAD && showUnread) "/>
+                          <slot name="name" :email="item"> {{ item.name }}</slot>
+                        </span>
+                        <span>
+                          <Icon v-if="item.isStar" icon="fluent-color:star-16" width="18" height="18"/>
+                        </span>
+                      </span>
+                      <span class="phone-time">{{ item.formatCreateTime }}</span>
+                    </div>
+                    <div>
+                      <div class="email-text">
+                        <span class="email-subject" :style="(item.unread === EmailUnreadEnum.UNREAD && showUnread)  ? 'font-weight: bold' : ''">
+                          <div class="unread" v-if="!isMobile && (item.unread === EmailUnreadEnum.UNREAD && showUnread) "/>
+                          <span v-if="item.code" class="code-tag" @click.stop="copyCode(item.code)">[{{ t('codeLabel') }}{{ item.code }}]</span>
+                          <span class="subject-text">
+                            <slot name="subject" :email="item" >
+                              {{ item.subject || '\u200B' }}
+                            </slot>
+                          </span>
+                        </span>
+                        <span class="email-content">{{ item.formatText || '\u200B' }}</span>
+                      </div>
+                      <div class="user-info" v-if="showUserInfo">
+                        <div class="user">
+                          <span>
+                            <Icon icon="mynaui:user" width="20" height="20"/>
+                          </span>
+                          <span>{{ item.userEmail }}</span>
+                        </div>
+                        <div class="account">
+                          <span>
+                            <Icon icon="mdi-light:email" width="20" height="20"/>
+                          </span>
+                          <span>{{ item.type === 0 ? item.toEmail : item.sendEmail }}</span>
+                        </div>
+                      </div>
                     </div>
                   </div>
-                  <div v-else></div>
-                  <span class="name">
-                    <span>
-                      <div class="unread" v-if="isMobile && (item.unread === EmailUnreadEnum.UNREAD && showUnread) "/>
-                      <slot name="name" :email="item"> {{ item.name }}</slot>
-                    </span>
-                    <span>
-                      <Icon v-if="item.isStar" icon="fluent-color:star-16" width="18" height="18"/>
-                    </span>
-                  </span>
-                  <span class="phone-time">{{ item.formatCreateTime }}</span>
+                  <div class="email-right" :style="showUserInfo ? 'align-self: start;':''">
+                    <span class="email-time" :style="(item.unread === EmailUnreadEnum.UNREAD && showUnread) ? 'font-weight: bold' : ''">{{ item.formatCreateTime }}</span>
+                  </div>
                 </div>
-                <div>
-                  <div class="email-text">
-                    <span class="email-subject" :style="(item.unread === EmailUnreadEnum.UNREAD && showUnread)  ? 'font-weight: bold' : ''">
-                      <div class="unread" v-if="!isMobile && (item.unread === EmailUnreadEnum.UNREAD && showUnread) "/>
-                      <span v-if="item.code" class="code-tag" @click.stop="copyCode(item.code)">[{{ t('codeLabel') }}{{ item.code }}]</span>
-                      <span class="subject-text">
-                        <slot name="subject" :email="item" >
-                          {{ item.subject || '\u200B' }}
-                        </slot>
-                      </span>
-                    </span>
-                    <span class="email-content">{{ item.formatText || '\u200B' }}</span>
-                  </div>
-                  <div class="user-info" v-if="showUserInfo">
-                    <div class="user">
-                      <span>
-                        <Icon icon="mynaui:user" width="20" height="20"/>
-                      </span>
-                      <span>{{ item.userEmail }}</span>
-                    </div>
-                    <div class="account">
-                      <span>
-                        <Icon icon="mdi-light:email" width="20" height="20"/>
-                      </span>
-                      <span>{{ item.type === 0 ? item.toEmail : item.sendEmail }}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div class="email-right" :style="showUserInfo ? 'align-self: start;':''">
-                <span class="email-time" :style="(item.unread === EmailUnreadEnum.UNREAD && showUnread) ? 'font-weight: bold' : ''">{{ item.formatCreateTime }}</span>
-              </div>
-            </div>
+              </template>
+
+              <!-- \u00A74.10\uFF1A\u6BCF\u4E00\u9879\u5728\u522B\u5904\u90FD\u6709\u7B49\u4EF7\u5165\u53E3\uFF08\u5DE5\u5177\u6761 / \u8BE6\u60C5\u9875 / \u641C\u7D22\u6846\uFF09\uFF0C\u53F3\u952E\u53EA\u662F\u52A0\u901F\u5668 -->
+              <MenuItem v-if="item.code" @select="copyCode(item.code)">
+                <template #icon><Icon icon="fluent-color:clipboard-24" width="20" height="20"/></template>
+                {{ t('copyCode') }}
+              </MenuItem>
+              <MenuItem v-if="props.type === 'email'" @select="emailRead(item.emailId)">
+                <template #icon><Icon icon="fluent:mail-read-20-regular" width="20" height="20"/></template>
+                {{ t('markAsRead') }}
+              </MenuItem>
+              <MenuItem v-if="['email','star'].includes(props.type)" @select="openReply(item)">
+                <template #icon><Icon icon="la:reply" width="20" height="20"/></template>
+                {{ t('reply') }}
+              </MenuItem>
+              <MenuItem v-if="['email','send','star'].includes(props.type)" @select="openForward(item)">
+                <template #icon><Icon icon="iconoir:arrow-up-right" width="19" height="19"/></template>
+                {{ t('forward') }}
+              </MenuItem>
+              <MenuItem v-if="['email','send','star'].includes(props.type)" @select="starChange(item)">
+                <template #icon><Icon icon="solar:star-line-duotone" width="19" height="19"/></template>
+                {{ t('star') }}
+              </MenuItem>
+              <template v-if="props.type === 'all-email'">
+                <MenuItem @select="handleSearch('user', item.userEmail)">
+                  <template #icon><Icon icon="iconoir:search" width="20" height="20"/></template>
+                  {{ t('searchUser') }}
+                </MenuItem>
+                <MenuItem @select="handleSearch('account', item.toEmail)">
+                  <template #icon><Icon icon="iconoir:search" width="20" height="20"/></template>
+                  {{ t('searchEmail') }}
+                </MenuItem>
+                <MenuItem @select="handleSearch('name', item.name)">
+                  <template #icon><Icon icon="iconoir:search" width="20" height="20"/></template>
+                  {{ t('searchSender') }}
+                </MenuItem>
+              </template>
+              <MenuSeparator />
+              <MenuItem tone="danger" @select="rightDelete(item.emailId)">
+                <template #icon><Icon icon="uiw:delete" width="16" height="20"/></template>
+                {{ t('delete') }}
+              </MenuItem>
+            </ContextMenu>
             <skeletonBlock v-else-if="item.expand === 'loading'"
                            :rows="1"
                            :showStar="showStar"
@@ -137,98 +187,17 @@
                        :showUserInfo="showUserInfo"
                        :type="type"/>
       <div class="empty" v-if="noLoading && emailList.length === 0 && !loading">
-        <el-empty :image-size="isMobile ? 120 : null" :description="$t('noMessagesFound')"/>
+        <EmptyState icon="iconoir:mail-out" :title="$t('noMessagesFound')"/>
       </div>
     </div>
-    <el-dropdown
-        ref="dropdownRef"
-        @visible-change="visibleChange"
-        :virtual-ref="triggerRef"
-        :show-arrow="false"
-        :popper-options="{
-      modifiers: [{ name: 'offset', options: { offset: [0, 0] } }],
-    }"
-        virtual-triggering
-        trigger="contextmenu"
-        placement="bottom-start"
-    >
-      <template #dropdown>
-        <el-dropdown-menu>
-          <el-dropdown-item v-if="rightClickEmail.code" @click="copyCode(rightClickEmail.code)" >
-            <template #default>
-              <div class="right-dropdown-item">
-                <Icon icon="fluent-color:clipboard-24" width="20" height="20" />
-                <span>{{t('copyCode')}}</span>
-              </div>
-            </template>
-          </el-dropdown-item>
-          <el-dropdown-item v-if="['email'].includes(props.type)" @click="emailRead(rightClickEmail.emailId)" >
-            <template #default>
-              <div class="right-dropdown-item">
-                <Icon icon="fluent:mail-read-20-regular" width="20" height="20" />
-                <span>{{t('markAsRead')}}</span>
-              </div>
-            </template>
-          </el-dropdown-item>
-          <el-dropdown-item v-if="['email','star'].includes(props.type)" @click="openReply(rightClickEmail)">
-            <template #default>
-              <div class="right-dropdown-item">
-                <Icon icon="la:reply" width="20" height="20"  />
-                <span>{{t('reply')}}</span>
-              </div>
-            </template>
-          </el-dropdown-item>
-          <el-dropdown-item v-if="['email','send', 'star'].includes(props.type)" @click="openForward(rightClickEmail)">
-            <template #default>
-              <div class="right-dropdown-item">
-                <Icon icon="iconoir:arrow-up-right" width="19" height="19"  />
-                <span>{{t('forward')}}</span>
-              </div>
-            </template>
-          </el-dropdown-item>
-          <el-dropdown-item v-if="['email','send', 'star'].includes(props.type)" @click="starChange(rightClickEmail)">
-            <template #default>
-              <div class="right-dropdown-item">
-                <Icon icon="solar:star-line-duotone" width="19" height="19"/>
-                <span>{{t('star')}}</span>
-              </div>
-            </template>
-          </el-dropdown-item>
-          <el-dropdown-item v-if="props.type === 'all-email'" @click="handleSearch('user', rightClickEmail.userEmail)">
-            <template #default>
-              <div class="right-dropdown-item">
-                <Icon icon="iconoir:search" width="20" height="20" />
-                <span>{{t('searchUser')}}</span>
-              </div>
-            </template>
-          </el-dropdown-item>
-          <el-dropdown-item v-if="props.type === 'all-email' " @click="handleSearch('account', rightClickEmail.toEmail)">
-            <template #default>
-              <div class="right-dropdown-item">
-                <Icon icon="iconoir:search" width="20" height="20" />
-                <span>{{t('searchEmail')}}</span>
-              </div>
-            </template>
-          </el-dropdown-item>
-          <el-dropdown-item v-if="props.type === 'all-email' " @click="handleSearch('name', rightClickEmail.name)">
-            <template #default>
-              <div class="right-dropdown-item">
-                <Icon icon="iconoir:search" width="20" height="20" />
-                <span>{{t('searchSender')}}</span>
-              </div>
-            </template>
-          </el-dropdown-item>
-          <el-dropdown-item @click="rightDelete(rightClickEmail.emailId)">
-            <template #default>
-              <div class="right-dropdown-item">
-                <Icon icon="uiw:delete" width="16" height="20" style="margin-left: 1px;margin-right: 3px" />
-                <span>{{t('delete')}}</span>
-              </div>
-            </template>
-          </el-dropdown-item>
-        </el-dropdown-menu>
-      </template>
-    </el-dropdown>
+    <AlertDialog
+        v-model:open="confirmOpen"
+        :title="confirmTitle"
+        :confirm-text="t('confirm')"
+        :cancel-text="t('cancel')"
+        tone="danger"
+        @confirm="confirmAccept"
+    />
   </div>
 </template>
 
@@ -236,6 +205,9 @@
 import {Icon} from "@iconify/vue";
 import skeletonBlock from "@/components/email-scroll/skeleton/index.vue"
 import {computed, onActivated, reactive, ref, watch, nextTick, onMounted, onUnmounted } from "vue";
+import {AlertDialog, Checkbox, ContextMenu, MenuItem, MenuSeparator, Tooltip} from "@/components/ui";
+import {EmptyState} from "@/components/composite";
+import {toast} from "@/components/ui/Toast/toast.js";
 import {useEmailStore} from "@/store/email.js";
 import {useUiStore} from "@/store/ui.js";
 import {openCompose} from "@/composables/useComposer.js";
@@ -320,24 +292,29 @@ let isMobile = ref(innerWidth < 1367)
 let skeletonRows = 0
 const timePaddingRight = ref('');
 const keyCount = ref(0);
-const dropdownRef = ref(null);
-const dropdownCloseLock = ref(false);
+/** 右键菜单是否开着 —— 只用来阻止「关菜单的那一下」被当成点开邮件 */
 const dropdownShow = ref(false);
-const rightClickEmail = ref({});
 const checkedEmailCount = ref(0);
 let timer = null
-const position = ref(
-    DOMRect.fromRect({
-      x: 0,
-      y: 0,
-    })
-)
 
-const triggerRef = ref({
-  getBoundingClientRect() {
-    return position.value;
-  }
-})
+/* P4：AlertDialog 是受控的、一次只开一个，所以用一组 ref 承载「标题 + 确认后干什么」，
+   代替 ElMessageBox.confirm().then() 那种即时 promise 写法。 */
+const confirmOpen = ref(false)
+const confirmTitle = ref('')
+let confirmAction = null
+
+function askConfirm(title, action) {
+  confirmTitle.value = title
+  confirmAction = action
+  confirmOpen.value = true
+}
+
+function confirmAccept() {
+  confirmOpen.value = false
+  const action = confirmAction
+  confirmAction = null
+  action?.()
+}
 
 const queryParam = reactive({
   size: 50
@@ -480,12 +457,6 @@ watch(() => emailStore.addStarEmailId, () => {
   })
 })
 
-window.addEventListener('wheel', (event) => {
-  if (dropdownShow.value) {
-    dropdownRef.value.handleClose();
-  }
-})
-
 function openReply(email) {
   openCompose('reply', {email})
 }
@@ -494,38 +465,19 @@ function openForward(email) {
   openCompose('forward', {email})
 }
 
-function visibleChange(e) {
-  dropdownShow.value = e;
-  dropdownCloseLock.value = true;
-  setTimeout(() => {
-    dropdownCloseLock.value = false;
-  },1500)
-
-  if (!e && rightClickEmail.value.rightChecked) {
-    rightClickEmail.value.rightChecked = false
-  }
-}
-
-const handleContextmenu = (event, email) => {
-
-  if (props.type === 'draft') {
-    return
-  }
-
-  if (rightClickEmail.value.rightChecked) {
-    rightClickEmail.value.rightChecked = false
-  }
-
-  const { clientX, clientY } = event
-  position.value = DOMRect.fromRect({
-    x: clientX,
-    y: clientY,
+/**
+ * P4：reka 的 ContextMenu 自己管光标定位与滚轮关闭，所以旧的
+ * `position` / `triggerRef` / `DOMRect.fromRect` / 全局 wheel 监听 / `handleContextmenu`
+ * 全部退场，这里只留下两件旧实现里真的有用的事：
+ *   1. 高亮当前右键的那一行（`rightChecked`）；
+ *   2. 记住菜单开着，好让紧接着的 click 不被当成「点开邮件」。
+ */
+function onContextOpen(email, open) {
+  dropdownShow.value = open
+  emailList.forEach(item => {
+    if (item.rightChecked && item !== email) item.rightChecked = false
   })
-  event.preventDefault();
-  dropdownRef.value?.handleOpen();
-
-  rightClickEmail.value = email;
-  rightClickEmail.value.rightChecked = true
+  email.rightChecked = open
 }
 
 function updateHasScrollbar() {
@@ -635,30 +587,18 @@ function localRead(emailIds) {
 
 function rightDelete(emailId) {
 
+  // 管理端「全部邮件」是物理删除，删不回来，所以多问一句；用户侧是移到回收站，直接删
   if (props.type === 'all-email') {
-    ElMessageBox.confirm(t('delOneEmailConfirm'), {
-      confirmButtonText: t('confirm'),
-      cancelButtonText: t('cancel'),
-      type: 'warning'
-    }).then(() => {
-      props.emailDelete([emailId]).then(() => {
-        ElMessage({
-          message: t('delSuccessMsg'),
-          type: 'success',
-          plain: true
-        })
-        emailStore.deleteIds = [emailId];
-      })
-    })
+    askConfirm(t('delOneEmailConfirm'), () => doDelete([emailId]))
     return;
   }
-  props.emailDelete([emailId]).then(() => {
-    ElMessage({
-      message: t('delSuccessMsg'),
-      type: 'success',
-      plain: true
-    })
-    emailStore.deleteIds = [emailId];
+  doDelete([emailId])
+}
+
+function doDelete(emailIds) {
+  props.emailDelete(emailIds).then(() => {
+    toast.success(t('delSuccessMsg'))
+    emailStore.deleteIds = emailIds;
   })
 }
 
@@ -669,43 +609,20 @@ function handleSearch(type, value) {
 async function copyCode(code) {
   try {
     await navigator.clipboard.writeText(code);
-    ElMessage({
-      message: t('copySuccessMsg'),
-      type: 'success',
-      plain: true
-    })
+    toast.success(t('copySuccessMsg'))
   } catch (err) {
     console.error(`${t('copyFailMsg')}:`, err);
-    ElMessage({
-      message: t('copyFailMsg'),
-      type: 'error',
-      plain: true
-    })
+    toast.error(t('copyFailMsg'))
   }
 }
 
 function handleDelete() {
-  ElMessageBox.confirm(t('delEmailsConfirm'), {
-    confirmButtonText: t('confirm'),
-    cancelButtonText: t('cancel'),
-    type: 'warning'
-  }).then(() => {
-
+  askConfirm(t('delEmailsConfirm'), () => {
     if (props.type === 'draft') {
-      const draftIds = getSelectedDraftsIds();
-      emit('delete-draft', draftIds);
+      emit('delete-draft', getSelectedDraftsIds());
       return;
     }
-
-    const emailIds = getSelectedMailsIds();
-    props.emailDelete(emailIds).then(() => {
-      ElMessage({
-        message: t('delSuccessMsg'),
-        type: 'success',
-        plain: true
-      })
-      emailStore.deleteIds = emailIds;
-    })
+    doDelete(getSelectedMailsIds())
   })
 }
 
@@ -768,8 +685,10 @@ function addItem(email) {
   return true;
 }
 
+/** L1 Checkbox 的三态 payload 可能是 `'indeterminate'`，这里归一成布尔再往下发 */
 function handleCheckAllChange(val) {
-  emailList.forEach(item => item.checked = val);
+  const checked = val === 'indeterminate' ? true : !!val;
+  emailList.forEach(item => item.checked = checked);
   isIndeterminate.value = false;
 }
 
@@ -791,16 +710,15 @@ function updateCheckStatus() {
 
 function jumpDetails(email) {
 
+  // 右键菜单开着时，这一下 click 是「关菜单」，不是「点开邮件」
   if (dropdownShow.value) {
-    dropdownRef.value.handleClose();
     return;
   }
 
-  if (!dropdownCloseLock.value) {
-    const sel = window.getSelection();
-    if (sel.toString().trim()) {
-      return
-    }
+  // 拖选文字后松手也会触发 click，有选区就不跳转
+  const sel = window.getSelection();
+  if (sel?.toString().trim()) {
+    return
   }
   emit('jump', email)
 }
@@ -870,25 +788,17 @@ function getEmailList(refresh = false) {
 }
 
 function handleList(list) {
+  // P4：状态图标表原来在这里抄了一份，P3 的 useMailList 又抄了一份。
+  // 现在只留 useMailList 那一份（颜色已换成语义 token），这里直接引用。
+  const icons = statusIconMap(t)
   list.forEach(email => {
     email.formatText = htmlToText(email)
     email.formatCreateTime = fromNow(email.createTime);
-    email.test = t('received')
-    const statusIconMap = {
-      0: { icon: 'ic:round-mark-email-read', color: '#51C76B', content: t('received') },
-      1: { icon: 'bi:send-arrow-up-fill',  color: '#51C76B', content: t('sent') },
-      2: { icon: 'bi:send-check-fill',     color: '#51C76B', content: t('delivered') },
-      3: { icon: 'bi:send-x-fill',         color: '#F56C6C', content: t('bounced') },
-      8: { icon: 'bi:send-x-fill',         color: '#F56C6C', content: t('bounced') },
-      4: { icon: 'bi:send-exclamation-fill', color: '#FBBD08', content: t('complained') },
-      5: { icon: 'bi:send-arrow-up-fill',  color: '#FBBD08', content: t('delayed') },
-      7: { icon: 'ic:round-mark-email-read', color: '#FBBD08', content: t('noRecipient') },
-    };
 
     if (email.isDel) {
       email.isDelContent = t('selectDeleted');
     }
-    email.statusIcon = statusIconMap[email.status];
+    email.statusIcon = icons[email.status];
   })
 }
 
@@ -918,7 +828,7 @@ function loadData() {
   grid-template-rows: auto 1fr;
   padding: 0;
   font-size: 14px;
-  color: var(--el-text-color-primary);
+  color: var(--color-fg);
   overflow: hidden;
   height: 100%;
 }
@@ -1080,7 +990,7 @@ function loadData() {
     }
 
     .email-sender {
-      color: var(--el-text-color-primary);
+      color: var(--color-fg);
       display: grid;
       grid-template-columns: auto 1fr auto;
 
@@ -1184,7 +1094,7 @@ function loadData() {
         height: 20px;
         line-height: 20px;
         font-size: 14px;
-        color: var(--el-text-color-primary);
+        color: var(--color-fg);
         overflow: hidden;
         white-space: nowrap;
         text-overflow: ellipsis;
@@ -1232,13 +1142,17 @@ function loadData() {
   }
 
   &:hover {
-    background-color: var(--email-hover-background);
+    background-color: var(--color-hover);
     z-index: 0;
   }
 
-  /*&[data-checked="true"] {
-    background-color: #c2dbff;
-  }*/
+  /* 右键菜单指向的那一行。旧实现把 #FDF6EC 直接写进 style，暗色下白得刺眼；
+     现在与 `MailRow` 的 `bg-hover + ring-line-strong` 口径一致（§7.4）。 */
+  &.email-row-context {
+    background-color: var(--color-hover);
+    box-shadow: inset 0 0 0 1px var(--color-line-strong);
+    z-index: 0;
+  }
 }
 
 
@@ -1270,10 +1184,6 @@ function loadData() {
   padding-right: v-bind(timePaddingRight);
 }
 
-:deep(.el-scrollbar__view) {
-  height: 100%;
-}
-
 .header-actions {
   display: grid;
   grid-template-columns: auto 1fr auto;
@@ -1290,7 +1200,7 @@ function loadData() {
     column-gap: 20px;
     row-gap: 8px;
     padding-left: 2px;
-    color: var(--el-text-color-primary);;
+    color: var(--color-fg);
   }
 
   .header-right {
@@ -1298,7 +1208,7 @@ function loadData() {
     grid-template-columns: auto auto;
     align-items: start;
     height: 100%;
-    color: var(--el-text-color-primary);;
+    color: var(--color-fg);
 
     .email-count {
       white-space: nowrap;
@@ -1318,7 +1228,7 @@ function loadData() {
 }
 
 .del-status {
-  color: var(--el-color-info);
+  color: var(--color-fg-muted);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1328,28 +1238,10 @@ function loadData() {
 
 
 
-.right-dropdown-item {
-  display: flex;
-  gap: 10px;
-}
-
-:deep(.el-dropdown-menu__item:last-child) {
-  padding-bottom: 10px;
-}
-
-:deep(.el-dropdown-menu__item:first-child) {
-  padding-top: 10px;
-}
-
-:deep(.el-dropdown-menu__item) {
-  padding-right: 14px;
-  padding-left: 14px;
-}
-
 .unread {
   height: 6px;
   width: 6px;
-  background: var(--el-color-primary);
+  background: var(--color-accent);
   margin-bottom: 2px;
   margin-right: 5px;
   border-radius: 50%;

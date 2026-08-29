@@ -19,71 +19,110 @@
 
     >
       <template #first>
-        <el-input
-            v-model="searchValue"
-            :placeholder="$t('searchByContent')"
-            class="search-input"
-        >
-          <template #prefix>
-            <div @click.stop="openSelect">
-              <el-select
-                  ref="mySelect"
-                  v-model="params.searchType"
-                  :placeholder="$t('select')"
-                  class="select"
-              >
-                <el-option key="3" :label="$t('sender')" :value="'name'"/>
-                <el-option key="4" :label="$t('subject')" :value="'subject'"/>
-                <el-option key="1" :label="$t('user')" :value="'user'"/>
-                <el-option key="2" :label="$t('selectEmail')" :value="'account'"/>
-              </el-select>
-              <div class="search-type">
-                <span>{{ selectTitle }}</span>
-                <Icon class="setting-icon" icon="mingcute:down-small-fill" width="20" height="20"/>
-              </div>
-            </div>
-          </template>
-        </el-input>
-        <el-select v-model="params.type" placeholder="Select" class="status-select" @change="typeSelectChange">
-          <el-option key="1" :label="$t('all')" value="all"/>
-          <el-option key="3" :label="$t('received')" value="receive"/>
-          <el-option key="2" :label="$t('sent')" value="send"/>
-          <el-option key="4" :label="$t('selectDeleted')" value="delete"/>
-          <el-option key="4" :label="$t('noRecipientTitle')" value="noone"/>
-        </el-select>
-        <Icon class="icon" icon="iconoir:search" @click="search" width="20" height="20"/>
-        <Icon class="icon" @click="changeTimeSort" icon="material-symbols-light:timer-arrow-down-outline"
-              v-if="params.timeSort === 0" width="28" height="28"/>
-        <Icon class="icon" @click="changeTimeSort" icon="material-symbols-light:timer-arrow-up-outline" v-else
-              width="28" height="28"/>
-        <Icon class="icon clear" icon="fluent:broom-sparkle-16-regular" width="22" height="22" @click="openBathDelete"/>
+        <!-- P4：旧实现把一个透明的 el-select 藏在 el-input 的 #prefix 里，靠
+             `mySelect.toggleMenu()` 假装成「输入框里的下拉」。L1 Input 的 #prefix 是
+             pointer-events-none + aria-hidden 的装饰位（放进去点不动、读屏也读不到），
+             所以搜索范围改成输入框旁边一个真正的 Select —— 键盘能到、读屏能念。 -->
+        <div class="search-group">
+          <Select
+              v-model="params.searchType"
+              :options="searchTypeOptions"
+              :aria-label="t('searchScope')"
+              size="sm"
+              class="scope-select"
+              @update:model-value="onScopeChange"
+          />
+          <Input
+              v-model="searchValue"
+              type="search"
+              size="sm"
+              clearable
+              class="search-input"
+              :placeholder="t('searchByContent')"
+              :aria-label="t('searchByContent')"
+              @enter="search"
+              @clear="search"
+          />
+        </div>
+        <Select
+            v-model="params.type"
+            :options="mailTypeOptions"
+            :aria-label="t('adminTable.mailTypeFilter')"
+            size="sm"
+            class="status-select"
+            @update:model-value="typeSelectChange"
+        />
+        <Button variant="ghost" size="icon-sm" :label="t('search')" @click="search">
+          <Icon icon="iconoir:search" width="20" height="20"/>
+        </Button>
+        <Button variant="ghost"
+                size="icon-sm"
+                :label="params.timeSort === 0 ? t('shell.oldestFirst') : t('shell.newestFirst')"
+                @click="changeTimeSort">
+          <Icon v-if="params.timeSort === 0" icon="material-symbols-light:timer-arrow-down-outline" width="24" height="24"/>
+          <Icon v-else icon="material-symbols-light:timer-arrow-up-outline" width="24" height="24"/>
+        </Button>
+        <Button variant="ghost" size="icon-sm" class="clear" :label="t('clearEmail')" @click="openBathDelete">
+          <Icon icon="fluent:broom-sparkle-16-regular" width="22" height="22"/>
+        </Button>
       </template>
     </emailScroll>
-    <el-dialog v-model="showBathDelete" :title="$t('clearEmail')" width="335"
-               @closed="closedClear">
-      <div class="clear-email">
-        <el-input v-model="clearParams.sendName" :placeholder="$t('sender')"/>
-        <el-input v-model="clearParams.subject" :placeholder="$t('subject')"/>
-        <el-input v-model="clearParams.sendEmail" :placeholder="$t('sendEmailAddress')"/>
-        <el-input v-model="clearParams.toEmail" :placeholder="$t('toEmail')"/>
-        <el-date-picker popper-class="my-date-picker"
-                        v-model="clearTime"
-                        type="daterange"
-                        :teleported="false"
-                        unlink-panels
-                        :range-separator="t('to')"
-                        size="default"
-        />
-        <div class="clear-button">
-          <el-select v-model="clearParams.type" style="width: 200px">
-            <el-option key="eq" :label="t('equal')" value="eq"/>
-            <el-option key="left" :label="t('leading')" value="left"/>
-            <el-option key="include" :label="t('include')" value="include"/>
-          </el-select>
-          <el-button :loading="clearLoading" type="primary" @click="batchDelete">{{ t('clear') }}</el-button>
-        </div>
+
+    <Dialog v-model:open="showBathDelete"
+            :title="t('clearEmail')"
+            :description="t('adminTable.clearEmailHint')"
+            size="sm"
+            @update:open="onClearDialogToggle">
+      <div class="grid gap-3">
+        <Field :label="t('sender')">
+          <template #default="{id}">
+            <Input :id="id" v-model="clearParams.sendName" :placeholder="t('sender')"/>
+          </template>
+        </Field>
+        <Field :label="t('subject')">
+          <template #default="{id}">
+            <Input :id="id" v-model="clearParams.subject" :placeholder="t('subject')"/>
+          </template>
+        </Field>
+        <Field :label="t('sendEmailAddress')">
+          <template #default="{id}">
+            <Input :id="id" v-model="clearParams.sendEmail" :placeholder="t('sendEmailAddress')"/>
+          </template>
+        </Field>
+        <Field :label="t('toEmail')">
+          <template #default="{id}">
+            <Input :id="id" v-model="clearParams.toEmail" :placeholder="t('toEmail')"/>
+          </template>
+        </Field>
+        <Field :label="t('adminTable.dateRange')">
+          <template #default="{id}">
+            <DatePicker :id="id" v-model="clearTime" range :placeholder="t('adminTable.dateRange')"/>
+          </template>
+        </Field>
+        <Field :label="t('adminTable.matchMode')">
+          <template #default="{id}">
+            <Select :id="id" v-model="clearParams.type" :options="matchModeOptions"/>
+          </template>
+        </Field>
       </div>
-    </el-dialog>
+
+      <template #footer>
+        <Button variant="ghost" @click="showBathDelete = false">{{ t('cancel') }}</Button>
+        <Button variant="danger" :loading="clearLoading" @click="batchDelete">{{ t('clear') }}</Button>
+      </template>
+    </Dialog>
+
+    <!-- 批量清除是物理删除且条件可能命中很多邮件，所以二次确认单独一层 -->
+    <AlertDialog
+        v-model:open="confirmClearOpen"
+        :title="t('clearEmail')"
+        :description="t('delAllConfirm')"
+        :confirm-text="t('clear')"
+        :cancel-text="t('cancel')"
+        tone="danger"
+        :loading="clearLoading"
+        @confirm="doBatchDelete"
+    />
   </div>
 </template>
 
@@ -99,6 +138,8 @@ import {
   allEmailLatest
 } from "@/request/all-email.js";
 import {Icon} from "@iconify/vue";
+import {AlertDialog, Button, DatePicker, Dialog, Field, Input, Select} from "@/components/ui";
+import {toast} from "@/components/ui/Toast/toast.js";
 import router from "@/router/index.js";
 import {useI18n} from 'vue-i18n';
 import {toUtc} from "@/utils/day.js";
@@ -114,20 +155,17 @@ const route = useRoute()
 const {t} = useI18n();
 const emailStore = useEmailStore();
 const settingStore = useSettingStore();
-const clearTime = ref('')
+/** DatePicker 的区间值是 `{start, end}`，两端都是 `'YYYY-MM-DD'` */
+const clearTime = ref(null)
 const sysEmailScroll = ref({})
 const searchValue = ref('')
-const mySelect = ref()
 const showBathDelete = ref(false)
+const confirmClearOpen = ref(false)
 const clearLoading = ref(false)
 
 onMounted(() => {
   latest();
 })
-
-const openSelect = () => {
-  mySelect.value.toggleMenu()
-}
 
 const params = reactive({
   timeSort: 0,
@@ -149,6 +187,27 @@ const clearParams = reactive({
   type: 'eq',
 })
 
+const searchTypeOptions = computed(() => [
+  {label: t('sender'), value: 'name'},
+  {label: t('subject'), value: 'subject'},
+  {label: t('user'), value: 'user'},
+  {label: t('selectEmail'), value: 'account'},
+])
+
+const mailTypeOptions = computed(() => [
+  {label: t('all'), value: 'all'},
+  {label: t('received'), value: 'receive'},
+  {label: t('sent'), value: 'send'},
+  {label: t('selectDeleted'), value: 'delete'},
+  {label: t('noRecipientTitle'), value: 'noone'},
+])
+
+const matchModeOptions = computed(() => [
+  {label: t('equal'), value: 'eq'},
+  {label: t('leading'), value: 'left'},
+  {label: t('include'), value: 'include'},
+])
+
 function resetClearParams() {
   clearParams.subject = ''
   clearParams.sendEmail = ''
@@ -158,19 +217,17 @@ function resetClearParams() {
   clearParams.endTime = ''
 }
 
-function closedClear() {
+/** 旧实现挂在 el-dialog 的 `@closed` 上；L1 Dialog 只给 open 的变化 */
+function onClearDialogToggle(open) {
+  if (open) return
   resetClearParams()
   clearParams.type = 'eq'
-  clearParams.endTime = ''
   clearTime.value = null
 }
 
-const selectTitle = computed(() => {
-  if (params.searchType === 'user') return t('user')
-  if (params.searchType === 'account') return t('selectEmail')
-  if (params.searchType === 'name') return t('sender')
-  if (params.searchType === 'subject') return t('subject')
-})
+/** 换搜索范围时不自动查 —— 输入框里的词可能不适用于新范围，等用户按回车/点放大镜 */
+function onScopeChange() {
+}
 
 const paramsStar = localStorage.getItem('all-email-params')
 if (paramsStar) {
@@ -193,37 +250,34 @@ function openBathDelete() {
 
 function batchDelete() {
 
-  if (clearTime.value) {
-    clearParams.startTime = toUtc(clearTime.value[0]).format("YYYY-MM-DD HH:mm:ss")
-    clearParams.endTime = toUtc(clearTime.value[1]).add(1, 'day').format("YYYY-MM-DD HH:mm:ss")
+  if (clearTime.value?.start && clearTime.value?.end) {
+    clearParams.startTime = toUtc(clearTime.value.start).format("YYYY-MM-DD HH:mm:ss")
+    clearParams.endTime = toUtc(clearTime.value.end).add(1, 'day').format("YYYY-MM-DD HH:mm:ss")
   }
 
-  if (!clearParams.sendEmail && !clearParams.sendName && !clearParams.subject && !clearParams.toEmail && !clearTime.value) {
+  const hasCondition = clearParams.sendEmail || clearParams.sendName || clearParams.subject
+      || clearParams.toEmail || clearParams.startTime
+
+  // 一个条件都没填就等于「清空全部」，旧实现在这里静默关窗，保持一致
+  if (!hasCondition) {
     showBathDelete.value = false
     return
   }
 
-  ElMessageBox.confirm(
-      t('delAllConfirm'),
-      {
-        confirmButtonText: t('confirm'),
-        cancelButtonText: t('cancel'),
-        type: 'warning',
-      }
-  ).then(() => {
-    clearLoading.value = true
+  confirmClearOpen.value = true
+}
 
-    allEmailBatchDelete(clearParams).then(() => {
-      ElMessage({
-        message: t('clearSuccess'),
-        type: "success",
-        plain: true
-      })
-      resetClearParams()
-      sysEmailScroll.value.refreshList();
-    }).finally(() => {
-      clearLoading.value = false
-    })
+function doBatchDelete() {
+  clearLoading.value = true
+
+  allEmailBatchDelete(clearParams).then(() => {
+    toast.success(t('clearSuccess'))
+    confirmClearOpen.value = false
+    showBathDelete.value = false
+    resetClearParams()
+    sysEmailScroll.value.refreshList();
+  }).finally(() => {
+    clearLoading.value = false
   })
 }
 
@@ -234,7 +288,7 @@ function rightSearch(type, value) {
 }
 
 function refreshBefore() {
-  searchValue.value = null
+  searchValue.value = ''
   params.timeSort = 0
   params.type = 'receive'
   params.userEmail = null
@@ -355,41 +409,6 @@ async function latest() {
 }
 
 </script>
-<style>
-
-@media (max-width: 767px) {
-  .el-date-range-picker .el-picker-panel__body {
-    min-width: auto;
-
-  }
-
-  .my-date-picker::after {
-    content: "";
-    position: absolute; /* 脱离文档流，不会撑开 */
-    left: 0;
-    right: 0;
-    height: 20px;
-    background: transparent; /* 方便看效果 */
-  }
-
-  .el-date-range-picker__content {
-    width: 100%;
-  }
-
-  .el-date-range-picker {
-    width: 300px;
-  }
-
-  .el-tooltip .el-picker_popper {
-    padding-bottom: 200px;
-  }
-
-  .el-date-range-picker__content.is-left {
-    border-right: 0;
-  }
-}
-
-</style>
 <style scoped lang="scss">
 .email-list-box {
   height: 100%;
@@ -397,85 +416,34 @@ async function latest() {
   overflow: hidden;
 }
 
-
-.search {
-  padding-top: 5px;
-  padding-bottom: 5px;
-}
-
-.select {
-  position: absolute;
-  width: 40px;
-  opacity: 0;
-  pointer-events: none;
-}
-
-.search-type {
-  display: flex;
-  color: var(--el-text-color-regular);
-}
-
 :deep(.header-actions) {
   padding-top: 8px;
   padding-bottom: 8px;
 }
 
-.search-input {
-  width: 100%;
-  max-width: 280px;
-  height: 28px;
-
-  .setting-icon {
-    position: relative;
-    top: 3px;
-  }
-}
-
-.clear-email {
-  display: flex;
-  flex-direction: column;
-  gap: 15px;
-}
-
-.clear-button {
+/* 搜索范围 + 关键词是一组，视觉上贴在一起（旧实现是把 select 藏进 input 里） */
+.search-group {
   display: flex;
   align-items: center;
-  gap: 15px;
+  gap: 6px;
+  min-width: 0;
+  flex: 1 1 auto;
+  max-width: 360px;
+}
 
-  .el-button {
-    width: 100%;
-  }
+.scope-select {
+  width: 88px;
+  flex: 0 0 auto;
+}
+
+.search-input {
+  min-width: 0;
+  flex: 1 1 auto;
 }
 
 .status-select {
-  margin-bottom: 2px;
   width: 102px;
-
-  :deep(.el-select__wrapper) {
-    min-height: 28px;
-  }
-}
-
-.input-with-select {
-  max-width: 200px;
-  border-radius: 0 4px 4px 0;
-}
-
-:deep(.input-with-select .el-input-group__append) {
-  background-color: var(--el-fill-color-blank);
-}
-
-:deep(.el-select__wrapper) {
-  padding: 2px 10px;
-  min-height: 28px;
-}
-
-:deep(.el-date-editor.el-input__wrapper) {
-  width: 303px;
-}
-
-.icon {
-  cursor: pointer;
+  flex: 0 0 auto;
 }
 
 .clear {

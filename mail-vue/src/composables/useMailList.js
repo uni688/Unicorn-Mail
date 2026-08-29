@@ -38,17 +38,21 @@ import {sleep} from '@/utils/time-utils.js'
 /** 虚拟列表里的行类型（§7.4：分组头是一种行，不是 sticky） */
 export const ROW = {GROUP: 'group', MAIL: 'mail', LOADING: 'loading', END: 'end'}
 
-/** 发信状态图标表，原样搬自 `email-scroll` :878-887 */
-function statusIconMap(t) {
+/**
+ * 发信状态图标表。P4：颜色从写死的 `#51C76B / #F56C6C / #FBBD08` 换成语义 token，
+ * 这样暗色模式下会自己跟着 `--um-{green,red,amber}-400` 走，不再是一组亮色硬编码。
+ * `email-scroll`（草稿箱 / 管理端「全部邮件」）也从这里取，避免两份表各自漂移。
+ */
+export function statusIconMap(t) {
     return {
-        0: {icon: 'ic:round-mark-email-read', color: '#51C76B', content: t('received')},
-        1: {icon: 'bi:send-arrow-up-fill', color: '#51C76B', content: t('sent')},
-        2: {icon: 'bi:send-check-fill', color: '#51C76B', content: t('delivered')},
-        3: {icon: 'bi:send-x-fill', color: '#F56C6C', content: t('bounced')},
-        4: {icon: 'bi:send-exclamation-fill', color: '#FBBD08', content: t('complained')},
-        5: {icon: 'bi:send-arrow-up-fill', color: '#FBBD08', content: t('delayed')},
-        7: {icon: 'ic:round-mark-email-read', color: '#FBBD08', content: t('noRecipient')},
-        8: {icon: 'bi:send-x-fill', color: '#F56C6C', content: t('bounced')},
+        0: {icon: 'ic:round-mark-email-read', color: 'var(--color-success)', content: t('received')},
+        1: {icon: 'bi:send-arrow-up-fill', color: 'var(--color-success)', content: t('sent')},
+        2: {icon: 'bi:send-check-fill', color: 'var(--color-success)', content: t('delivered')},
+        3: {icon: 'bi:send-x-fill', color: 'var(--color-danger)', content: t('bounced')},
+        4: {icon: 'bi:send-exclamation-fill', color: 'var(--color-warning)', content: t('complained')},
+        5: {icon: 'bi:send-arrow-up-fill', color: 'var(--color-warning)', content: t('delayed')},
+        7: {icon: 'ic:round-mark-email-read', color: 'var(--color-warning)', content: t('noRecipient')},
+        8: {icon: 'bi:send-x-fill', color: 'var(--color-danger)', content: t('bounced')},
     }
 }
 

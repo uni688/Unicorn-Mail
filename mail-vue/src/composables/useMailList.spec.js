@@ -213,7 +213,7 @@ describe('useMailList · 行展平与分组', () => {
         const row = list.mails[0]
         expect(row.formatText).toBe('正文 粗')
         expect(row.formatCreateTime).toBeTruthy()
-        expect(row.statusIcon.color).toBe('#F56C6C')
+        expect(row.statusIcon.color).toBe('var(--color-danger)')
         expect(row.isDelContent).toBe('selectDeleted')
     })
 })
