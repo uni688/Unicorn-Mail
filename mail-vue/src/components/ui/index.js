@@ -52,6 +52,7 @@ export * from './Tooltip/index.js'
 
 /* ------------------------------------------------------ 布局、导航与数据 */
 export * from './Collapsible/index.js'
+export * from './DataTable/index.js'
 export * from './Pagination/index.js'
 export * from './ScrollArea/index.js'
 export * from './Tabs/index.js'

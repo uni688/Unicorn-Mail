@@ -158,6 +158,7 @@
       <DsForms />
       <DsOverlays />
       <DsNavigation />
+      <DsData />
 
       <section id="composite" class="scroll-mt-20">
         <h2 class="text-title-lg">L2 复合层</h2>
@@ -191,6 +192,7 @@ import DsDisplay from './sections/DsDisplay.vue'
 import DsForms from './sections/DsForms.vue'
 import DsOverlays from './sections/DsOverlays.vue'
 import DsNavigation from './sections/DsNavigation.vue'
+import DsData from './sections/DsData.vue'
 import DsShell from './sections/DsShell.vue'
 
 const {mode, isDark, setMode} = useTheme()
@@ -199,7 +201,7 @@ const {current} = useBreakpoint()
 const modeLabel = {light: '浅色', dark: '深色', system: '跟随系统'}
 
 /** `src/components/ui/**\/*.vue` 的个数；`test/ui-barrels.spec.js` 守着别漏导出 */
-const COMPONENT_COUNT = 50
+const COMPONENT_COUNT = 51
 
 /** `composite/` + `domain/` 的个数；同一个测试也守着这两个桶 */
 const COMPOSITE_COUNT = 25
@@ -244,6 +246,7 @@ const TOC = [
   {id: 'scrollarea', label: 'ScrollArea'},
   {id: 'pagination', label: 'Pagination'},
   {id: 'tree', label: 'Tree'},
+  {id: 'datatable', label: 'DataTable'},
 ]
 
 /** L2 目录，顺序与 `DsShell.vue` 里的区块一致 */

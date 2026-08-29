@@ -381,7 +381,14 @@ const zh = {
         more: '更多',
         undo: '撤销',
         retry: '重试',
-        notifications: '通知'
+        notifications: '通知',
+        /* DataTable（§6.2） */
+        noData: '暂无数据',
+        loadFailed: '加载失败',
+        selectAll: '全选本页',
+        selectRow: '选择此行',
+        selectedCount: '已选 {n} 项（本页共 {total} 项）',
+        totalCount: '共 {n} 条'
     },
     /* AppShell / 命令面板 / 命令条（§5.1 §6.2 §7.2） */
     shell: {

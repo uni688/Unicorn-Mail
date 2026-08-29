@@ -46,6 +46,13 @@ export const UI_TEXT_FALLBACK = {
     undo: '撤销',
     retry: '重试',
     notifications: '通知',
+    /* DataTable（§6.2）：表格自己要能说出「空了」「挂了」「选了几行」 */
+    noData: '暂无数据',
+    loadFailed: '加载失败',
+    selectAll: '全选本页',
+    selectRow: '选择此行',
+    selectedCount: '已选 {n} 项（本页共 {total} 项）',
+    totalCount: '共 {n} 条',
 }
 
 /**

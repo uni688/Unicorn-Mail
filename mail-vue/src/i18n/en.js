@@ -377,7 +377,14 @@ const en = {
         more: 'More',
         undo: 'Undo',
         retry: 'Retry',
-        notifications: 'Notifications'
+        notifications: 'Notifications',
+        /* DataTable (§6.2) */
+        noData: 'No data',
+        loadFailed: 'Failed to load',
+        selectAll: 'Select all on this page',
+        selectRow: 'Select this row',
+        selectedCount: '{n} selected ({total} on this page)',
+        totalCount: '{n} total'
     },
     /* AppShell / command palette / command bar (§5.1 §6.2 §7.2) */
     shell: {
