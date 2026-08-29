@@ -533,6 +533,24 @@ const zh = {
             roomy: '宽松',
         },
     },
+    /* 管理域表格页（§7.9 / §10.4）。旧页面已有的文案（noCodeFound / delSuccessMsg /
+       add / delete …）继续用顶层键，这里只放 DataTable 迁移新增的部分。 */
+    admin: {
+        /* 四态：DataTable 的 #error / #empty 插槽用 */
+        loadFailed: '数据没能加载出来',
+        loadFailedHint: '可能是网络断了。重试一次通常就好。',
+        errorDetail: '技术细节',
+        /* 「操作」列的表头；读屏会念到，不能留空 */
+        actions: '操作',
+        batchDelete: '删除选中',
+        /* 注册码页 */
+        emptyRegKey: '还没有注册码',
+        emptyRegKeyHint: '注册码能限制谁可以注册、能注册几次。',
+        clearInvalid: '清除失效注册码',
+        delRegKeysConfirm: '确认删除选中的 {n} 个注册码吗？',
+        historyEmpty: '还没有人用过这个注册码',
+        copyCode: '复制注册码',
+    },
     /* 登录 / 注册 / 绑定 / OAuth 回调（§5.3）。旧登录页已有的文案继续用顶层键，
        这里只补新增的四个视图需要、旧页面没有的部分。 */
     auth: {

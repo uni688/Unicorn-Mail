@@ -529,6 +529,24 @@ const en = {
             roomy: 'Roomy',
         },
     },
+    /* Admin table pages (§7.9 / §10.4). Copy the legacy pages already had
+       (noCodeFound / delSuccessMsg / add / delete …) keeps its top-level keys. */
+    admin: {
+        /* Four states: used by DataTable's #error / #empty slots */
+        loadFailed: 'Could not load the data',
+        loadFailedHint: 'The network may be down. A retry usually fixes it.',
+        errorDetail: 'Technical details',
+        /* Header of the actions column; screen readers read it, so it cannot be empty */
+        actions: 'Actions',
+        batchDelete: 'Delete selected',
+        /* Registration keys page */
+        emptyRegKey: 'No registration keys yet',
+        emptyRegKeyHint: 'Keys control who can sign up, and how many times.',
+        clearInvalid: 'Clear invalid keys',
+        delRegKeysConfirm: 'Delete the {n} selected registration keys?',
+        historyEmpty: 'Nobody has used this key yet',
+        copyCode: 'Copy key',
+    },
     /* Sign in / sign up / bind / OAuth callback (§5.3). Copy that already exists on the
        legacy login view keeps its top-level keys; only the new bits live here. */
     auth: {

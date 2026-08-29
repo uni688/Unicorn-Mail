@@ -1,569 +1,524 @@
-<template>
-  <div class="reg-key">
-    <div class="header-actions">
-      <Icon class="icon" icon="ion:add-outline" width="23" height="23" @click="openAdd"/>
-      <div class="search">
-        <el-input
-            v-model="params.code"
-            class="search-input"
-            :placeholder="$t('searchRegKeyDesc')"
-        >
-        </el-input>
-      </div>
-      <Icon class="icon" icon="iconoir:search" @click="search" width="20" height="20"/>
-      <Icon class="icon" icon="ion:reload" width="18" height="18" @click="refresh"/>
-      <Icon class="icon" icon="fluent:broom-sparkle-16-regular" width="22" height="22" @click="clearNotUse"/>
-    </div>
-
-    <el-scrollbar class="scrollbar">
-      <div  class="loading" :class="regKeyLoading ? 'loading-show' : 'loading-hide'" :style="regKeyFirst ? 'background: transparent' : ''">
-        <loading/>
-      </div>
-      <div class="code-box">
-        <div class="code-item" v-for="item in regKeyData">
-          <div class="code-info">
-            <div class="info-left">
-              <div class="info-left-item">
-                <span class="code" @click="copyCode(item.code)">{{ item.code }}</span>
-              </div>
-              <div class="info-left-item">
-                <div>{{ $t('remainingUses') }}：</div>
-                <div v-if="item.count">{{ item.count }}</div>
-                <el-tag v-else type="danger">{{ $t('exhausted') }}</el-tag>
-              </div>
-              <div class="info-left-item">
-                <div>{{ $t('roleDesc') }}：</div>
-                <el-tag>{{ item.roleName }}</el-tag>
-              </div>
-              <div class="info-left-item">
-                <div>{{ $t('validUntil') }}：</div>
-                <div v-if="item.expireTime">{{ formatExpireTime(item.expireTime) }}</div>
-                <el-tag v-else type="danger">{{ $t('expired') }}</el-tag>
-              </div>
-            </div>
-            <div class="info-right">
-              <el-dropdown class="setting">
-                <Icon icon="fluent:settings-24-filled" width="21" height="21" color="#909399"/>
-                <template #dropdown>
-                  <el-dropdown-menu>
-                    <el-dropdown-item @click="copyCode(item.code)">{{ $t('copy') }}</el-dropdown-item>
-                    <el-dropdown-item @click="openHistory(item)">{{ $t('history') }}</el-dropdown-item>
-                    <el-dropdown-item @click="deleteRegKey(item)">{{ $t('delete') }}</el-dropdown-item>
-                  </el-dropdown-menu>
-                </template>
-              </el-dropdown>
-            </div>
-          </div>
-        </div>
-      </div>
-      <div class="empty" v-if="regKeyData.length === 0">
-        <el-empty v-if="!regKeyFirst" :image-size="isMobile ? 120 : null" :description="$t('noCodeFound')"/>
-      </div>
-    </el-scrollbar>
-    <el-dialog v-model="showAdd" :title="$t('addRegKey')">
-      <div class="container">
-        <el-input v-model="addForm.code" :placeholder="$t('regKey')">
-          <template #suffix>
-            <Icon @click.stop="genCode" class="gen-code" icon="bitcoin-icons:refresh-filled" width="24" height="24"/>
-          </template>
-        </el-input>
-        <el-select v-model="addForm.roleId" :placeholder="$t('roleDesc')">
-          <el-option v-for="item in roleList" :label="item.name" :value="item.roleId" :key="item.roleId"/>
-        </el-select>
-        <el-date-picker
-            v-model="addForm.expireTime"
-            type="date"
-            :placeholder="$t('validUntil')"
-        />
-        <el-input-number v-model="addForm.count" :min="1" :max="99999"/>
-        <el-button class="btn" type="primary" @click="submit" :loading="addLoading"
-        >{{ $t('add') }}
-        </el-button>
-      </div>
-    </el-dialog>
-    <el-dialog class="history-list" v-model="showRegKeyHistory" :title="$t('useHistory')">
-      <div class="loading" :class="historyLoading ? 'loading-show' : 'loading-hide'">
-        <loading/>
-      </div>
-      <el-table v-if="!historyLoading" :data="historyList" :fit="true" style="height: 100%">
-        <el-table-column :min-width="emailColumnWidth" property="email" :label="$t('user')"
-                         :show-overflow-tooltip="true"/>
-        <el-table-column :width="createTimeColumnWidth" :formatter="formatUserCreateTime" property="createTime"
-                         :label="$t('date')" fixed="right" :show-overflow-tooltip="true"/>
-      </el-table>
-    </el-dialog>
-  </div>
-</template>
-
 <script setup>
-import {defineOptions, nextTick, reactive, ref, watch} from "vue"
-import {Icon} from "@iconify/vue";
-import loading from "@/components/loading/index.vue";
-import {useSettingStore} from "@/store/setting.js";
-import {roleSelectUse} from "@/request/role.js";
-import {useRoleStore} from "@/store/role.js";
-import {regKeyAdd, regKeyList, regKeyClearNotUse, regKeyDelete, regKeyHistory} from "@/request/reg-key.js";
-import {getTextWidth} from "@/utils/text.js";
-import dayjs from "dayjs";
-import {tzDayjs} from "@/utils/day.js";
-import {useI18n} from "vue-i18n";
+/**
+ * 注册码 — 管理域表格页第一张（§10.4 / §6.2）
+ *
+ * 从「卡片网格 + 历史弹窗里的 el-table」换成 `DataTable`。几个和别的管理页不一样
+ * 的地方，都是被后端接口的语义逼出来的，不是随手定的：
+ *
+ * 1. **没有分页器**。`/regKey/list` 返回的是全量列表（`reg-key-service.list()` 里
+ *    没有 limit/offset，只有 `code` 前缀过滤），所以 `total` / `pageSize` 都不传 ——
+ *    画一个只有一页的分页器是噪音（DataTable 自己也会藏）。
+ * 2. **排序在前端做**。同上：整份数据都在手里，本地排序看到的就是全部，不会像
+ *    「只排当前页」那样骗人。过期的 `expireTime` 被服务端置成 `null`，排序时一律
+ *    沉底，否则「已过期」会插在有效期中间。
+ * 3. **可以批量删**。`regKeyDelete()` 本来就收数组（`?regKeyIds=1,2,3`），
+ *    所以选择列不是摆设。
+ *
+ * 顺手修掉一个旧 bug：`submit()` 里空注册码的提示写的是 `$('emptyRegKeyMsg')`
+ * —— `$` 在这个文件里不存在，点下去只会抛 ReferenceError，用户看不到任何提示。
+ */
+import {computed, reactive, ref, watch} from 'vue'
+import {useI18n} from 'vue-i18n'
+import dayjs from 'dayjs'
+import IconPlus from '~icons/lucide/plus'
+import IconSearch from '~icons/lucide/search'
+import IconRefresh from '~icons/lucide/refresh-cw'
+import IconEraser from '~icons/lucide/eraser'
+import IconShuffle from '~icons/lucide/shuffle'
+import IconEllipsis from '~icons/lucide/ellipsis'
+import IconKey from '~icons/lucide/key-round'
+import IconUser from '~icons/lucide/user-round'
+import {
+    AlertDialog, Badge, Button, CopyButton, DataTable, DatePicker, Dialog,
+    DropdownMenu, Field, Input, MenuItem, MenuSeparator, NumberInput, Select,
+} from '@/components/ui'
+import {EmptyState, ErrorState} from '@/components/composite'
+import {toast} from '@/components/ui/Toast/toast.js'
+import {useSelection} from '@/composables/useSelection.js'
+import {hasPerm} from '@/perm/perm.js'
+import {regKeyAdd, regKeyClearNotUse, regKeyDelete, regKeyHistory, regKeyList} from '@/request/reg-key.js'
+import {roleSelectUse} from '@/request/role.js'
+import {useRoleStore} from '@/store/role.js'
+import {useSettingStore} from '@/store/setting.js'
+import {tzDayjs} from '@/utils/day.js'
 
-defineOptions({
-  name: 'reg-key'
-})
-
-const roleStore = useRoleStore();
-const settingStore = useSettingStore();
-const params = reactive({
-  code: '',
-})
+defineOptions({name: 'reg-key'})
 
 const {t} = useI18n()
-const roleList = reactive([])
-const addLoading = ref(false)
-const showAdd = ref(false)
-const regKeyLoading = ref(true)
-const regKeyFirst = ref(true)
-const showRegKeyHistory = ref(false)
-const historyList = reactive([])
-const emailColumnWidth = ref(0)
-const createTimeColumnWidth = ref(0)
-const historyLoading = ref(false)
-const isMobile = window.innerWidth < 1025
+const settingStore = useSettingStore()
+const roleStore = useRoleStore()
 
-const addForm = reactive({
-  code: '',
-  count: 1,
-  roleId: null,
-  expireTime: null
-})
+const params = reactive({code: ''})
+const list = ref([])
+const loading = ref(true)
+const error = ref(null)
 
-const regKeyData = reactive([])
+const canDelete = computed(() => hasPerm('reg-key:delete'))
 
-getList(true)
+/* ------------------------------------------------------------------ 列与排序 */
 
-roleSelectUse().then(list => {
-  roleList.length = 0
-  roleList.push(...list)
-})
+const columns = computed(() => [
+    {key: 'code', label: t('regKey'), minWidth: '160px', truncate: true},
+    {key: 'roleName', label: t('roleDesc'), width: '140px'},
+    {key: 'count', label: t('remainingUses'), width: '120px', align: 'end', sortable: true},
+    {key: 'expireTime', label: t('validUntil'), width: '150px', sortable: true},
+    {key: 'actions', label: t('admin.actions'), width: '68px', align: 'end', cardHidden: true},
+])
 
-watch(() => roleStore.refresh, () => {
-  roleSelectUse().then(list => {
-    roleList.length = 0
-    roleList.push(...list)
-  })
-})
+/** 默认不排序：服务端已经按 regKeyId 倒序给了，也就是「最近建的在上」 */
+const sort = ref(null)
 
-function openHistory(regKey) {
-
-  historyList.length = 0
-  historyLoading.value = true
-  regKeyHistory(regKey.regKeyId).then(list => {
-
-    historyList.push(...list)
-    if (list.length > 0) {
-
-      const email = list.reduce((a, b) =>
-          compareByLengthAndUpperCase(a, b, 'email')
-      ).email;
-
-      emailColumnWidth.value = getTextWidth(email) + 30
-      emailColumnWidth.value = emailColumnWidth.value < 300 ? emailColumnWidth.value : 300
-      const createTime = list.reduce((a, b) =>
-          compareByLengthAndUpperCase(a, b, 'createTime')
-      ).createTime;
-      createTimeColumnWidth.value = getTextWidth(createTime)
+const rows = computed(() => {
+    const current = sort.value
+    if (!current?.key) {
+        return list.value
     }
+    const dir = current.order === 'asc' ? 1 : -1
+    return [...list.value].sort((a, b) => {
+        const x = a[current.key]
+        const y = b[current.key]
+        // null 沉底且不跟着方向翻：过期的注册码永远排在有效的后面
+        if (x == null || y == null) {
+            return x == null ? (y == null ? 0 : 1) : -1
+        }
+        if (x === y) {
+            return 0
+        }
+        return x > y ? dir : -dir
+    })
+})
 
-  }).finally(() => {
-    historyLoading.value = false
-  })
+const selection = useSelection(rows, {idKey: 'regKeyId'})
 
-  showRegKeyHistory.value = true
+/* ---------------------------------------------------------------- 列表请求 */
+
+async function getList() {
+    loading.value = true
+    error.value = null
+    try {
+        // noMsg：失败画进 DataTable 的 error 态，不再弹 toast
+        const data = await regKeyList(params, {noMsg: true})
+        list.value = Array.isArray(data) ? data : []
+        selection.clear()
+    } catch (e) {
+        error.value = e
+        list.value = []
+    } finally {
+        loading.value = false
+    }
 }
 
-const compareByLengthAndUpperCase = (a, b, key) => {
-  const getUpperCaseCount = (str) => (str.match(/[A-Z]/g) || []).length;
-  if (a[key].length === b[key].length) {
-    return getUpperCaseCount(a[key]) > getUpperCaseCount(b[key]) ? a : b;
-  }
-  return a[key].length > b[key].length ? a : b;
-};
+const errorDetail = computed(() => String(error.value?.message ?? ''))
 
-function formatUserCreateTime(regKey) {
-  const createTime = tzDayjs(regKey.createTime);
-  const currentYear = dayjs().year();
-  const expireYear = createTime.year();
-
-  if (settingStore.lang === 'en') {
-
-    if (expireYear === currentYear) {
-      return createTime.format('MMM D, HH:mm');
-    } else {
-      return createTime.format('MMM D, YYYY HH:mm');
-    }
-
-  } else {
-
-    if (expireYear === currentYear) {
-      return createTime.format('M月D日 HH:mm');
-    } else {
-      return createTime.format('YYYY年M月D日 HH:mm');
-    }
-
-  }
-
-}
-
-function formatExpireTime(expireTime) {
-  const expireDate = tzDayjs(expireTime);
-  const currentYear = dayjs().year();
-  const expireYear = expireDate.year();
-
-  if (settingStore.lang === 'en') {
-
-    return expireYear === currentYear
-        ? expireDate.format('MMM D')
-        : expireDate.format('MMM D, YYYY');
-
-  } else {
-
-    return expireYear === currentYear
-        ? expireDate.format('M月D日')
-        : expireDate.format('YYYY年M月D日');
-
-  }
+function search() {
+    getList()
 }
 
 function refresh() {
-  params.code = null
-  getList(true)
+    params.code = ''
+    getList()
 }
 
-function search() {
-  getList(true)
-}
+getList()
 
-function getList(showLoading = false) {
-  if (showLoading) {
-    regKeyLoading.value = true
-  }
-  regKeyList(params).then(list => {
-    regKeyData.length = 0
-    regKeyData.push(...list)
-    regKeyLoading.value = false
-    setTimeout(() => {
-      regKeyFirst.value = false
-    },200)
-  })
-}
+/* ------------------------------------------------------------------ 身份下拉 */
 
-async function copyCode(code) {
-  try {
-    await navigator.clipboard.writeText(code);
-    ElMessage({
-      message: t('copySuccessMsg'),
-      type: 'success',
-      plain: true,
+const roleList = ref([])
+
+function loadRoles() {
+    roleSelectUse().then((data) => {
+        roleList.value = Array.isArray(data) ? data : []
     })
-  } catch (err) {
-    console.error('复制失败:', err);
-    ElMessage({
-      message: '复制失败',
-      type: 'error',
-      plain: true,
-    })
-  }
+}
+
+loadRoles()
+watch(() => roleStore.refresh, loadRoles)
+
+const roleOptions = computed(() => roleList.value.map((role) => ({label: role.name, value: role.roleId})))
+
+/* -------------------------------------------------------------------- 时间 */
+
+/** 有效期只到天，同年不重复报年份（沿用旧页面的格式，别让用户重新认一遍日期） */
+function formatExpireTime(value) {
+    const date = tzDayjs(value)
+    const sameYear = date.year() === dayjs().year()
+    if (settingStore.lang === 'en') {
+        return sameYear ? date.format('MMM D') : date.format('MMM D, YYYY')
+    }
+    return sameYear ? date.format('M月D日') : date.format('YYYY年M月D日')
+}
+
+/** 使用记录到分钟 */
+function formatCreateTime(value) {
+    const date = tzDayjs(value)
+    const sameYear = date.year() === dayjs().year()
+    if (settingStore.lang === 'en') {
+        return sameYear ? date.format('MMM D, HH:mm') : date.format('MMM D, YYYY HH:mm')
+    }
+    return sameYear ? date.format('M月D日 HH:mm') : date.format('YYYY年M月D日 HH:mm')
+}
+
+/* -------------------------------------------------------------------- 新增 */
+
+const showAdd = ref(false)
+const addLoading = ref(false)
+const addForm = reactive({code: '', count: 1, roleId: null, expireTime: null})
+
+function randomCode(length = 8) {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
+    let result = ''
+    for (let i = 0; i < length; i++) {
+        result += chars.charAt(Math.floor(Math.random() * chars.length))
+    }
+    return result
 }
 
 function genCode() {
-  addForm.code = generateRandomCode()
+    addForm.code = randomCode()
 }
 
-function generateRandomCode(length = 8) {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-  let result = '';
-  for (let i = 0; i < length; i++) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return result;
-}
-
-function clearNotUse() {
-  ElMessageBox.confirm(t('clearRegKey'), {
-    confirmButtonText: t('confirm'),
-    cancelButtonText: t('cancel'),
-    type: 'warning'
-  }).then(() => {
-    regKeyClearNotUse().then(() => {
-      ElMessage({
-        message: t('clearSuccess'),
-        type: 'success',
-        plain: true,
-      })
-      getList()
-    })
-  });
-}
-
-function submit() {
-
-  if (!addForm.code) {
-    ElMessage({
-      message: $('emptyRegKeyMsg'),
-      type: "error",
-      plain: true
-    })
-    return
-  }
-
-  if (!addForm.roleId) {
-    ElMessage({
-      message: t('emptyRole'),
-      type: "error",
-      plain: true
-    })
-    return
-  }
-
-  if (!addForm.expireTime) {
-    ElMessage({
-      message: t('emptyTimeMsg'),
-      type: "error",
-      plain: true
-    })
-    return
-  }
-
-  if (!addForm.count) {
-    ElMessage({
-      message: t('emptyCountMsg'),
-      type: "error",
-      plain: true
-    })
-    return
-  }
-
-  addLoading.value = true
-  regKeyAdd(addForm).then(() => {
-    showAdd.value = false
-    resetForm()
-    ElMessage({
-      message: t('addSuccessMsg'),
-      type: "success",
-      plain: true
-    })
-    getList()
-  }).finally(() => {
-    addLoading.value = false
-  })
-}
-
-function deleteRegKey(regKey) {
-  ElMessageBox.confirm(t('delConfirm', {msg: regKey.code}), {
-    confirmButtonText: t('confirm'),
-    cancelButtonText: t('cancel'),
-    type: 'warning'
-  }).then(() => {
-    regKeyDelete([regKey.regKeyId]).then(() => {
-      getList()
-      ElMessage({
-        message: t('delSuccessMsg'),
-        type: "success",
-        plain: true
-      })
-    })
-  });
-}
-
-function resetForm() {
-  addForm.code = ''
+/** 菜单里的「复制」；行内那颗按钮是 CopyButton，自己会处理成功/失败 */
+async function copyCode(code) {
+    try {
+        await navigator.clipboard.writeText(code)
+        toast.success(t('copySuccessMsg'))
+    } catch {
+        toast.error(t('ui.copyFailed'))
+    }
 }
 
 function openAdd() {
-  genCode()
-  showAdd.value = true
+    genCode()
+    showAdd.value = true
 }
 
+async function submit() {
+    if (!addForm.code) {
+        toast.error(t('emptyRegKeyMsg'))
+        return
+    }
+    if (!addForm.roleId) {
+        toast.error(t('emptyRole'))
+        return
+    }
+    if (!addForm.expireTime) {
+        toast.error(t('emptyTimeMsg'))
+        return
+    }
+    if (!addForm.count) {
+        toast.error(t('emptyCountMsg'))
+        return
+    }
+    addLoading.value = true
+    try {
+        await regKeyAdd({...addForm})
+        showAdd.value = false
+        addForm.code = ''
+        toast.success(t('addSuccessMsg'))
+        await getList()
+    } finally {
+        addLoading.value = false
+    }
+}
+
+/* ------------------------------------------------- 删除 / 清除失效（AlertDialog） */
+
+const confirmOpen = ref(false)
+const confirmLoading = ref(false)
+const confirmData = ref({title: '', description: '', confirmText: '', run: null})
+
+function ask(next) {
+    confirmData.value = {description: '', ...next}
+    confirmOpen.value = true
+}
+
+function askDelete(row) {
+    ask({
+        title: t('delConfirm', {msg: row.code}),
+        confirmText: t('delete'),
+        run: () => regKeyDelete([row.regKeyId]).then(() => toast.success(t('delSuccessMsg'))),
+    })
+}
+
+function askBatchDelete() {
+    const ids = [...selection.ids.value]
+    ask({
+        title: t('admin.delRegKeysConfirm', {n: ids.length}),
+        confirmText: t('delete'),
+        run: () => regKeyDelete(ids).then(() => toast.success(t('delSuccessMsg'))),
+    })
+}
+
+function askClearNotUse() {
+    ask({
+        title: t('clearRegKey'),
+        confirmText: t('clear'),
+        run: () => regKeyClearNotUse().then(() => toast.success(t('clearSuccess'))),
+    })
+}
+
+async function runConfirm() {
+    confirmLoading.value = true
+    try {
+        await confirmData.value.run?.()
+        confirmOpen.value = false
+        await getList()
+    } finally {
+        confirmLoading.value = false
+    }
+}
+
+/* -------------------------------------------------------------- 使用记录弹窗 */
+
+const showHistory = ref(false)
+const historyCode = ref('')
+const historyId = ref(null)
+const historyRows = ref([])
+const historyLoading = ref(false)
+const historyError = ref(null)
+
+const historyColumns = computed(() => [
+    {key: 'email', label: t('user'), minWidth: '180px', truncate: true},
+    {key: 'createTime', label: t('date'), width: '150px', align: 'end', formatter: formatCreateTime},
+])
+
+async function loadHistory() {
+    historyLoading.value = true
+    historyError.value = null
+    try {
+        const data = await regKeyHistory(historyId.value, {noMsg: true})
+        historyRows.value = Array.isArray(data) ? data : []
+    } catch (e) {
+        historyError.value = e
+        historyRows.value = []
+    } finally {
+        historyLoading.value = false
+    }
+}
+
+function openHistory(row) {
+    historyId.value = row.regKeyId
+    historyCode.value = row.code
+    historyRows.value = []
+    showHistory.value = true
+    loadHistory()
+}
 </script>
 
-<style scoped lang="scss">
-.reg-key {
-  height: 100%;
-  overflow: hidden;
-}
+<template>
+  <div class="flex h-full min-h-0 flex-col bg-canvas">
+    <!-- 工具条：主行动在左，检索与批量维护在右（§7.9） -->
+    <div class="flex flex-wrap items-center gap-2 border-b border-line px-4 py-2.5">
+      <Button v-perm="'reg-key:add'" variant="primary" size="sm" @click="openAdd">
+        <IconPlus class="size-4" />
+        {{ t('addRegKey') }}
+      </Button>
 
-.scrollbar {
-  height: calc(100% - 48px);
-  position: relative;
-  background: var(--extra-light-fill);
-  @media (max-width: 372px) {
-    height: calc(100% - 85px);
-  }
+      <div class="ml-auto flex items-center gap-1.5">
+        <Input
+          v-model="params.code"
+          type="search"
+          size="sm"
+          clearable
+          class="w-40 sm:w-56"
+          :placeholder="t('searchRegKeyDesc')"
+          :aria-label="t('searchRegKeyDesc')"
+          @enter="search"
+          @clear="search"
+        />
+        <Button variant="ghost" size="icon-sm" :label="t('ui.search')" @click="search">
+          <IconSearch class="size-4" />
+        </Button>
+        <Button variant="ghost" size="icon-sm" :label="t('mail.refresh')" @click="refresh">
+          <IconRefresh class="size-4" />
+        </Button>
+        <Button
+          v-perm="'reg-key:delete'"
+          variant="ghost"
+          size="icon-sm"
+          :label="t('admin.clearInvalid')"
+          @click="askClearNotUse"
+        >
+          <IconEraser class="size-4" />
+        </Button>
+      </div>
+    </div>
+    <div class="flex min-h-0 flex-1 flex-col p-4">
+      <DataTable
+        v-model:sort="sort"
+        :columns="columns"
+        :rows="rows"
+        row-key="regKeyId"
+        :aria-label="$t('inviteCode')"
+        :loading="loading"
+        :error="errorDetail || Boolean(error)"
+        :selectable="canDelete"
+        :selection="selection"
+        class="min-h-0 flex-1"
+        scroll-class="min-h-0"
+        @retry="getList"
+        @empty-action="openAdd"
+      >
+        <template #cell-code="{value}">
+          <div class="flex min-w-0 items-center gap-1">
+            <span class="truncate font-mono text-mono text-fg">{{ value }}</span>
+            <CopyButton :value="value" :label="$t('admin.copyCode')" />
+          </div>
+        </template>
 
-  .code-box {
-    padding: 15px 15px 25px 15px;
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-    gap: 15px;
+        <template #cell-roleName="{value}">
+          <Badge v-if="value">{{ value }}</Badge>
+          <span v-else class="text-fg-muted">—</span>
+        </template>
 
-    .code-item {
-      background: var(--el-bg-color);
-      border-radius: 8px;
-      border: 1px solid var(--el-border-color);
-      transition: all 200ms;
-      padding: 15px;
+        <template #cell-count="{value}">
+          <span v-if="value" class="um-tnum">{{ value }}</span>
+          <Badge v-else tone="danger">{{ $t('exhausted') }}</Badge>
+        </template>
 
-      .code-info {
-        display: flex;
+        <!-- 服务端把过期的注册码的 expireTime 置成 null（reg-key-service.list） -->
+        <template #cell-expireTime="{value}">
+          <span v-if="value" class="um-tnum text-fg-muted">{{ formatExpireTime(value) }}</span>
+          <Badge v-else tone="danger">{{ $t('expired') }}</Badge>
+        </template>
+        <template #cell-actions="{row}">
+          <DropdownMenu align="end">
+            <template #trigger>
+              <Button variant="ghost" size="icon-sm" :label="t('ui.more')">
+                <IconEllipsis class="size-4" />
+              </Button>
+            </template>
+            <MenuItem @select="copyCode(row.code)">{{ t('copy') }}</MenuItem>
+            <MenuItem @select="openHistory(row)">{{ t('useHistory') }}</MenuItem>
+            <template v-if="canDelete">
+              <MenuSeparator />
+              <MenuItem tone="danger" @select="askDelete(row)">{{ t('delete') }}</MenuItem>
+            </template>
+          </DropdownMenu>
+        </template>
 
-        .info-left {
-          flex: 1;
-          min-width: 0;
+        <!-- 批量删除：`regKeyDelete()` 本来就收数组 -->
+        <template #actions="{count}">
+          <Button variant="danger" size="sm" @click="askBatchDelete">
+            {{ t('admin.batchDelete') }}（{{ count }}）
+          </Button>
+        </template>
 
-          .info-left-item {
-            display: flex;
-            padding-top: 5px;
+        <template #empty>
+          <EmptyState
+            :icon="IconKey"
+            :title="params.code ? t('mail.emptySearch') : t('admin.emptyRegKey')"
+            :description="params.code ? t('mail.emptySearchHint') : t('admin.emptyRegKeyHint')"
+            :action-label="params.code ? '' : t('addRegKey')"
+            @action="openAdd"
+          />
+        </template>
 
-            .code {
-              font-weight: bold;;
-              font-size: 16px;
-              white-space: nowrap;
-              overflow: hidden;
-              text-overflow: ellipsis;
-              cursor: pointer;
-            }
-          }
+        <template #error="{detail, retry}">
+          <ErrorState
+            :title="t('admin.loadFailed')"
+            :description="t('admin.loadFailedHint')"
+            :detail="detail"
+            :retry-label="t('ui.retry')"
+            :detail-label="t('admin.errorDetail')"
+            @retry="retry"
+          />
+        </template>
 
-          .info-left-item:first-child {
-            padding-top: 0;
-          }
-        }
+        <template #footer>{{ t('ui.totalCount', {n: list.length}) }}</template>
+      </DataTable>
+    </div>
 
-        .info-right {
-          display: flex;
-          flex-direction: column;
-          padding-top: 2px;
-          gap: 5px;
-        }
-      }
-    }
-  }
-}
+    <!-- 新增 -->
+    <Dialog v-model:open="showAdd" :title="t('addRegKey')" size="sm">
+      <div class="grid gap-3">
+        <Field :label="t('regKey')" required>
+          <template #default="{id, invalid}">
+            <!-- 重新生成按钮不能放进 Input 的 #suffix：那个槽是 pointer-events-none +
+                 aria-hidden 的装饰位，放按钮进去点不动也读不到 -->
+            <div class="flex items-center gap-1.5">
+              <Input
+                :id="id"
+                v-model="addForm.code"
+                :invalid="invalid"
+                class="min-w-0 flex-1"
+                :placeholder="t('regKey')"
+              />
+              <Button variant="secondary" size="icon" :label="t('admin.regenerate')" @click="genCode">
+                <IconShuffle class="size-4" />
+              </Button>
+            </div>
+          </template>
+        </Field>
 
-.empty {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  height: 100%;
-}
+        <Field :label="t('roleDesc')" required>
+          <template #default="{id, invalid}">
+            <Select
+              :id="id"
+              v-model="addForm.roleId"
+              :invalid="invalid"
+              :options="roleOptions"
+              :placeholder="t('select')"
+            />
+          </template>
+        </Field>
 
-:deep(.history-list.el-dialog) {
-  min-height: 300px;
-  width: 500px !important;
-  @media (max-width: 540px) {
-    width: calc(100% - 40px) !important;
-    margin-right: 20px !important;
-    margin-left: 20px !important;
-  }
-}
+        <Field :label="t('validUntil')" required>
+          <template #default="{id, invalid}">
+            <DatePicker :id="id" v-model="addForm.expireTime" :invalid="invalid" :placeholder="t('validUntil')" />
+          </template>
+        </Field>
 
-.history-list .loading {
-  position: absolute;
-  top: 10px;
-  z-index: 0;
-  background: rgba(255, 255, 255, 0);
-}
+        <Field :label="t('remainingUses')" required>
+          <template #default="{id}">
+            <NumberInput :id="id" v-model="addForm.count" :min="1" :max="99999" />
+          </template>
+        </Field>
+      </div>
 
-:deep(.history-list .el-dialog__header) {
-  padding-bottom: 5px;
-}
+      <template #footer>
+        <Button variant="ghost" @click="showAdd = false">{{ t('cancel') }}</Button>
+        <Button variant="primary" :loading="addLoading" @click="submit">{{ t('add') }}</Button>
+      </template>
+    </Dialog>
+    <!-- 删除 / 清除失效：替代 ElMessageBox.confirm，焦点默认落在「取消」 -->
+    <AlertDialog
+      v-model:open="confirmOpen"
+      :title="confirmData.title"
+      :description="confirmData.description"
+      :confirm-text="confirmData.confirmText"
+      :cancel-text="t('cancel')"
+      tone="danger"
+      :loading="confirmLoading"
+      @confirm="runConfirm"
+    />
 
-:deep(.el-scrollbar__view) {
-  height: calc(100% - 80px);
-}
-
-.loading {
-  position: absolute;
-  left: 0;
-  top: 0;
-  width: 100%;
-  height: 100%;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  background: var(--loadding-background);
-  z-index: 2;
-}
-
-.loading-show {
-  transition: all 200ms ease 200ms;
-  opacity: 1;
-}
-
-.loading-hide {
-  pointer-events: none;
-  transition: var(--loading-hide-transition);
-  opacity: 0;
-}
-
-.container {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 15px;
-}
-
-:deep(.el-dialog) {
-  width: 400px !important;
-  @media (max-width: 440px) {
-    width: calc(100% - 40px) !important;
-    margin-right: 20px !important;
-    margin-left: 20px !important;
-  }
-}
-
-.setting {
-  cursor: pointer;
-}
-
-.gen-code {
-  color: #606266;
-  cursor: pointer;
-}
-
-.header-actions {
-  padding: 9px 15px;
-  display: flex;
-  gap: 18px;
-  flex-wrap: wrap;
-  align-items: center;
-  box-shadow: inset 0 -1px 0 0 rgba(100, 121, 143, 0.12);
-  font-size: 18px;
-  @media (max-width: 767px) {
-    gap: 15px;
-  }
-
-  .search-input {
-    width: min(200px, calc(100vw - 140px));
-  }
-
-  .search {
-    :deep(.el-input-group) {
-      height: 28px;
-    }
-
-    :deep(.el-input__inner) {
-      height: 28px;
-    }
-  }
-
-  .icon {
-    cursor: pointer;
-  }
-}
-
-:deep(.el-table__inner-wrapper:before) {
-  background: var(--el-bg-color);
-}
-
-</style>
+    <!-- 使用记录 -->
+    <Dialog v-model:open="showHistory" :title="t('useHistory')" :description="historyCode" size="md">
+      <DataTable
+        :columns="historyColumns"
+        :rows="historyRows"
+        row-key="userId"
+        :aria-label="t('useHistory')"
+        :loading="historyLoading"
+        :error="String(historyError?.message ?? '') || Boolean(historyError)"
+        :skeleton-rows="3"
+        scroll-class="max-h-80"
+        @retry="loadHistory"
+      >
+        <template #empty>
+          <EmptyState :icon="IconUser" :title="t('admin.historyEmpty')" />
+        </template>
+        <template #error="{detail, retry}">
+          <ErrorState
+            :title="t('admin.loadFailed')"
+            :detail="detail"
+            :retry-label="t('ui.retry')"
+            :detail-label="t('admin.errorDetail')"
+            @retry="retry"
+          />
+        </template>
+      </DataTable>
+    </Dialog>
+  </div>
+</template>

@@ -82,6 +82,12 @@ const props = defineProps({
     rowClickable: {type: Boolean, default: false},
     /** 高亮当前行（详情页联动） */
     activeKey: {type: [String, Number], default: undefined},
+    /**
+     * 加在滚动容器上的类。`stickyHeader` 只有在这个容器**自己是有界的滚动口**时才生效
+     * （sticky 认的是最近的 scrollport），所以整页表格要把高度约束传到这里，例如
+     * 根节点 `class="min-h-0 flex-1"` + `scroll-class="min-h-0"`。
+     */
+    scrollClass: {type: [String, Array, Object], default: undefined},
     class: {type: [String, Array, Object], default: undefined},
 })
 
@@ -253,7 +259,7 @@ const showPagination = computed(() => props.total > 0 && props.pageSize > 0 && p
       md 以上「列多到放不下」兜底 —— 无论如何都不允许把外层布局撑破（§4.1）。
     -->
     <div
-      class="min-w-0 overflow-x-auto rounded-lg border border-line"
+      :class="cn('min-w-0 overflow-x-auto rounded-lg border border-line', props.scrollClass)"
       :aria-busy="isBusy || undefined"
     >
       <table
