@@ -954,6 +954,30 @@ API Keys │ 请求日志 │ 调试台 │ 文档
 - **文档**：内置接口索引（method + path + 参数表 + 示例），并链接外部部署文档 `doc.skymail.ink`。同时**标注 `/public/*` 为 Deprecated**，引导迁移到 `/open/*` + Bearer Key。
 - 兼容：现有 `/public/genToken` 全局单令牌保留可用（标记弃用），新体系并行。
 
+> **P4 实施修订（2026-08-30）**：上面这一节在落地时有 4 处与代码事实不符，按代码走。
+>
+> 1. **四个条目是 4 条独立路由，不是页内 Tab，也还没有左导航可挂。**
+>    `SettingsShell` 是 P5 的交付物（§5.3.6），P4 时 `/settings/admin/*` 各页仍是独立整页。
+>    所以四页落在 `/settings/developer/{keys,logs,console,docs}`，共用一个横向分段控件
+>    `composite/DeveloperNav.vue` 过渡。**P5 接壳时删掉它**，别把它演进成 `SettingsShell`。
+> 2. **权限按「功能开关」而不是「数据隔离」用。** §10.5 的表结构给了 `api_key.user_id`
+>    （Key 属于用户），§10.5.2 又说 `api-key:*` / `api-log:query` 默认只给管理员——两者
+>    不能同时成立。实现口径：数据边界由 SQL 兜底，所有 `api_key` / `api_log` 查询强制
+>    `and(eq(userId, 当前用户))`，越权在 SQL 层就无从发生；perm 点仍然新增（`perm_id`
+>    从 37 起），语义是站长「允许某角色使用开放 API」的开关。两者职责分开，不互相代替。
+> 3. **Key 的展示前缀取 8 位，不是示例里的 4 位。** §10.5 的表上有
+>    `CREATE UNIQUE INDEX idx_api_key_prefix`，而 `um_live_7f3a` 那种 4 位十六进制只有
+>    65536 种，装到几万个 Key 时必然撞唯一索引、创建直接失败。理由写在
+>    `mail-worker/src/const/api-const.js` 的注释里。
+> 4. **调试台的三种代码片段只做了 cURL 一种。** 原文写 cURL / JS fetch / Python requests
+>    三份。三份片段要各自跟着参数表变化，等于三套模板同步维护；P4 只出 cURL（终端可直接
+>    粘），JS / Python 挪到 P6 文案收口时一起做。文档页与创建 Key 后的一次性弹窗同样只给 cURL。
+>
+> 另外两条不是修订、是补充：接口描述表 `enums/open-api-enum.js` 由调试台与文档页**同读一份**
+> （分两份维护时文档上的参数在调试台里填不进去）；`/open/*` 的实际基址必须带 `VITE_BASE_URL`
+> 那一段（`index.js` 只把 `/api/` 前缀交给 hono，`/open/email/list` 是 404，
+> `/api/open/email/list` 才通）。
+
 #### 5.3.6 设置中心（v1.1 扩为三组，承接所有非邮件功能）
 
 Linear 式：左侧 220px 分组导航 + 右侧 max 720px 内容列，每个 section 独立路由、独立保存态。**这是本轮 IA 调整的落点**——侧栏腾出去的东西全在这里。
@@ -1694,6 +1718,29 @@ v1.1 变化说明：`views/overview/` 已删除——原「概览」按受众一
 | **P6 清理** | 卸载 `element-plus`/`@iconify/vue`/`nprogress`；删 `compat-ep.css` 与 36 个旧变量；删 `/test`；i18n 补全（zh/en 双语 diff 为 0）；a11y 与视觉回归基线 | 干净代码库 | `grep -r "el-" src` 为 0；`!important` ≤ 5；`:deep(` 为 0；构建体积报告 | 4 |
 
 合计 **≈ 53 人日**（v1.0 为 48；v1.1 因侧栏自定义、设置中心壳、材质层与 5 项后端增量增加 5 人日）。v1.2 的邮箱切换器改动**不改变总人日**：P3 里新增 `MailboxPicker` 与增量 6 约 +1.5 人日，但侧栏不再需要"N 个邮箱分组 + 分组折叠态持久化 + 分组级计数聚合"，抵掉约 1.5 人日；且 `MailboxPicker` 与 `MailList` 共用同一套虚拟化 composable，不是从零写。单人 ≈ 11 周；两人并行 ≈ 6.5 周，P1/P2 可并行，P3 建议单人独占以免冲突。
+
+> **P4 实施修订（2026-08-30）**：上表 P4 那一行的「6 处 `el-table`」与实际仓库不符，
+> 交付范围按代码事实收窄，并新增两件表上没写的东西。
+>
+> 1. **`el-table` 是 4 处不是 6 处，其中 1 处不属于 P4。** 实际是
+>    `user`(1294 行 / 29 个标签)、`role`(551 / 10)、`reg-key`(569 / 5)、
+>    `sys-setting`(2015 / 5)。前三处已迁 `DataTable`；`sys-setting` 的 5 个表格嵌在
+>    9 张卡片里，P5 拆 section 时会连带重写，P4 去动它只会白干一次并制造冲突，
+>    因此**留给 P5**。P4 结束时全库 `<el-table` 标签只剩 `sys-setting` 的 3 个。
+> 2. **`all-email` 没有 `el-table`。** 它复用旧 `emailScroll` 虚拟列表
+>    （`type='all-email'` + `show-user-info` + `show-status`），不是表格。所以它没走
+>    `DataTable`，而是跟着 `email-scroll` 一起退出 Element Plus（`0c4c686`）。
+> 3. **`DataTable` 是先补的地基，不是顺带产物。** 三张管理表共用它，所以它单独一个
+>    commit（`05d4cc8`）先落地并进 `/_ds`，之后按 `reg-key` → `role` → `user`
+>    从小到大迁移，每张表一个 commit、可单独回退。`user` 那张按计划先抽
+>    `useUserAdmin()` 纯逻辑 composable、模板不动跑通，再换模板。
+> 4. **迁移函数名从 `v3_1DB()` 改为 `v3_2DB()`**（§10.5.2 的名字已被 P3 的
+>    `del_time` 占用），新增 `api_key` / `api_log` 两张表，`perm_id` 从 **37** 起。
+> 5. **新增了 `security/api-key-auth.js` 与 `/open/*` 命名空间**——表上原本只写
+>    「后端新表接口」。`/open/*` 用 `Authorization: Bearer`，走不了 `security.js` 的
+>    JWT 中间件，必须 `exclude[]` 追加 `'/open'` 后另挂一个中间件（`a9b9239`）。
+>
+> P4 实际拆成 8 个 commit（`05d4cc8` → `859806a`）+ 本次文档回填。
 
 **风险最高的是 P3**：`email-scroll/index.vue` 1367 行里混着虚拟列表、增量拉取、右键菜单、批量选择、骨架、未读计数、自动刷新轮询（`views/email/index.vue:77-131` 的 `while(true)` 长轮询）。迁移策略是**先抽逻辑再换视图**：第一步把它拆成 `useMailList()` composable（纯逻辑，不动模板），跑通后再替换模板。这样任一步出错都能单独回退。v1.1 又给 P3 加了侧栏自定义与日期分组，因此把 `FolderTree` 排在 `MailList` 之前做——它是纯新增组件、不碰旧逻辑，可以先合并、先看到效果。v1.2 追加一条 P3 内部顺序：**`MailboxPicker` 紧跟 `FolderTree`**，因为侧栏只显示当前邮箱，没有 Picker 就无法切换邮箱，两者必须同一批上线（在此之前保留旧 `account/index.vue` 作为过渡入口）。
 
