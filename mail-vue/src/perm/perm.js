@@ -174,5 +174,59 @@ const routers = {
             name: 'analysis',
             menu: true
         }
+    }],
+    /*
+     * 开发者中心（§5.3.5 / §4.3）。§0.8 的过渡形态：`SettingsShell` 还没有，所以这里是
+     * 四条平级路由 + 页内 [[DeveloperNav]]，而不是一条带 `children` 的父路由。
+     * P5 侧栏分组落地后把它们收成 children 即可，路由名不用动（深链、命令面板、
+     * `DeveloperNav` 全部按 name 找路由）。
+     *
+     * 权限切分按「读的是哪张表」（§0.9）：三页读 `api_key`，日志页读 `api_log`。
+     * 只有 `api-log:query` 的账号进得去日志页，`DeveloperNav` 那时只剩一项、自己不渲染。
+     *
+     * `meta.title` 用点号键（`developer.keys`）而不是再在顶层复制一份文案：
+     * 命令面板与 ⚙ 菜单都是 `t(row.label)` / `t(r.title)`，点号键照样解析。
+     */
+    'api-key:query': [
+        {
+            path: '/settings/developer/keys',
+            name: 'developer-keys',
+            component: () => import('@/views/developer/keys.vue'),
+            meta: {
+                title: 'developer.keys',
+                name: 'developer-keys',
+                menu: true
+            }
+        },
+        {
+            path: '/settings/developer/console',
+            name: 'developer-console',
+            component: () => import('@/views/developer/console.vue'),
+            meta: {
+                title: 'developer.console',
+                name: 'developer-console',
+                menu: true
+            }
+        },
+        {
+            path: '/settings/developer/docs',
+            name: 'developer-docs',
+            component: () => import('@/views/developer/docs.vue'),
+            meta: {
+                title: 'developer.docs',
+                name: 'developer-docs',
+                menu: true
+            }
+        }
+    ],
+    'api-log:query': [{
+        path: '/settings/developer/logs',
+        name: 'developer-logs',
+        component: () => import('@/views/developer/logs.vue'),
+        meta: {
+            title: 'developer.logs',
+            name: 'developer-logs',
+            menu: true
+        }
     }]
 }

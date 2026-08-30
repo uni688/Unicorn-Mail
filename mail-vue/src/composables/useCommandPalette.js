@@ -48,6 +48,10 @@ import IconShield from '~icons/lucide/shield'
 import IconTicket from '~icons/lucide/ticket'
 import IconServerCog from '~icons/lucide/server-cog'
 import IconUser from '~icons/lucide/user'
+import IconKeyRound from '~icons/lucide/key-round'
+import IconScrollText from '~icons/lucide/scroll-text'
+import IconTerminal from '~icons/lucide/terminal'
+import IconBookOpen from '~icons/lucide/book-open'
 import {useTheme} from '@/composables/useTheme.js'
 import {useBgEffect, USER_BG_MODES} from '@/composables/useBgEffect.js'
 import {useUserStore} from '@/store/user.js'
@@ -204,6 +208,18 @@ export const SETTINGS = [
     {name: 'reg-key', label: 'inviteCode', icon: IconTicket, group: 'admin', keywords: 'invite regkey yaoqingma'},
     {name: 'all-email', label: 'allMail', icon: IconMails, group: 'admin', keywords: 'all mail quanbuyoujian'},
     {name: 'sys-setting', label: 'SystemSettings', icon: IconServerCog, group: 'admin', keywords: 'system admin xitongshezhi'},
+    /*
+     * 开发者中心四页（§5.3.5）。归到 `account` 而不是 `admin`：Key 与日志都是**当前用户
+     * 自己的**数据（§0.9 —— SQL 永远带 `userId`），`api-key:*` 只是「谁能用这个功能」的
+     * 开关。放进「管理」栏会让人以为在这里能看到别人的 Key。
+     *
+     * §0.8 里开发者中心还没有侧栏入口，这两处（⚙ 菜单 + `#` 模式）是唯一的入口，
+     * 所以四页都要在这里出现，否则只能靠手敲 URL 进去。
+     */
+    {name: 'developer-keys', label: 'developer.keys', icon: IconKeyRound, group: 'account', keywords: 'api key token developer miyao'},
+    {name: 'developer-logs', label: 'developer.logs', icon: IconScrollText, group: 'account', keywords: 'api log request developer rizhi'},
+    {name: 'developer-console', label: 'developer.console', icon: IconTerminal, group: 'account', keywords: 'api console playground developer diaoshi'},
+    {name: 'developer-docs', label: 'developer.docs', icon: IconBookOpen, group: 'account', keywords: 'api docs reference developer wendang'},
 ]
 
 /**

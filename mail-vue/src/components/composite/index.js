@@ -32,6 +32,10 @@ export {default as PasswordInput} from './PasswordInput.vue'
 export {default as CommandPalette} from './CommandPalette.vue'
 export {default as ShortcutsDialog} from './ShortcutsDialog.vue'
 
+/* ------------------------------------------------------------------ 导航 */
+/* §0.8 的过渡件：开发者中心四页的页内导航，P5 侧栏分组落地后整体删除 */
+export {default as DeveloperNav} from './DeveloperNav.vue'
+
 /* ------------------------------------------------------------------ 状态 */
 /* §7.8 状态矩阵的「空 / 错」两档，列表、搜索结果、回收站共用 */
 export {default as EmptyState} from './EmptyState.vue'

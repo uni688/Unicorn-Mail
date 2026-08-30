@@ -113,6 +113,12 @@ describe('permsToRouter · 权限页（§5.2「映射关系不变，只改目标
         'reg-key': '/settings/admin/invites',
         'all-email': '/settings/admin/mail',
         analysis: '/settings/admin/overview',
+        // 开发者中心（§5.3.5）。§0.8 的过渡形态：四条平级路由 + 页内 DeveloperNav，
+        // 前三页跟着 `api-key:query`，日志页跟着 `api-log:query`（§0.9 按表切权限）
+        'developer-keys': '/settings/developer/keys',
+        'developer-console': '/settings/developer/console',
+        'developer-docs': '/settings/developer/docs',
+        'developer-logs': '/settings/developer/logs',
     }
 
     const LEGACY = {
@@ -130,11 +136,11 @@ describe('permsToRouter · 权限页（§5.2「映射关系不变，只改目标
     const pages = all.filter((r) => r.name)
     const aliases = all.filter((r) => !r.name)
 
-    it('八个权限页的名字与新 path 一一对应', () => {
+    it('权限页的名字与新 path 一一对应', () => {
         expect(Object.fromEntries(pages.map((r) => [r.name, r.path]))).toEqual(PAGES)
     })
 
-    it('每个权限页都带一条旧路径别名', () => {
+    it('有旧路径的权限页都带一条别名（开发者中心是新页，没有旧路径可留）', () => {
         expect(Object.fromEntries(aliases.map((r) => [r.path, r.redirect.name]))).toEqual(LEGACY)
     })
 
@@ -172,5 +178,35 @@ describe('permsToRouter · 权限页（§5.2「映射关系不变，只改目标
         expect(send.meta).toEqual({title: 'sent', name: 'send', menu: true, mail: true})
         const analysis = pages.find((r) => r.name === 'analysis')
         expect(analysis.meta).toEqual({title: 'analytics', name: 'analysis', menu: true})
+    })
+
+    /**
+     * §0.9：Key 与日志读的是两张表，权限也就切成两把。只有 `api-log:query` 的账号
+     * 应当只拿到日志页 —— 这时 `DeveloperNav` 只剩一项、自己不渲染（组件内已测）。
+     */
+    it('开发者中心按表切权限：Key 三页跟 api-key:query，日志页跟 api-log:query', () => {
+        const keyOnly = permsToRouter(['api-key:query'])
+        expect(keyOnly.map((r) => r.name)).toEqual(['developer-keys', 'developer-console', 'developer-docs'])
+
+        const logOnly = permsToRouter(['api-log:query'])
+        expect(logOnly.map((r) => r.name)).toEqual(['developer-logs'])
+        expect(logOnly.map((r) => r.path)).toEqual(['/settings/developer/logs'])
+    })
+
+    it('开发者中心不注册旧路径别名（这四页是新增的，没有历史 URL）', () => {
+        const devPaths = ['/keys', '/api-keys', '/api-log', '/developer']
+        for (const legacy of devPaths) {
+            expect(all.find((r) => r.path === legacy)).toBeUndefined()
+        }
+        expect(aliases.some((r) => String(r.redirect.name).startsWith('developer-'))).toBe(false)
+    })
+
+    /** 标题键走点号（`developer.keys`）：⚙ 菜单与命令面板都是 `t(row.label)`，能解析 */
+    it('开发者中心四页的 meta 指向 developer.* 文案键', () => {
+        for (const name of ['developer-keys', 'developer-console', 'developer-docs', 'developer-logs']) {
+            const page = pages.find((r) => r.name === name)
+            expect(page.meta.title).toBe(`developer.${name.replace('developer-', '')}`)
+            expect(page.meta.name).toBe(name)
+        }
     })
 })
