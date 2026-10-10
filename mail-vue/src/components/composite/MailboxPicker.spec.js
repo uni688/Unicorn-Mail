@@ -125,6 +125,21 @@ describe('MailboxPicker · 触发器', () => {
 
 describe('MailboxPicker · 面板结构', () => {
 
+    /**
+     * P4 收尾时用户报的「点了没反应」：外层 Tooltip 自带的 PopperRoot 截走了 ComboboxAnchor 的
+     * 锚点注册，ComboboxRoot 自己的 PopperRoot 永远没有锚点，floating-ui 从不计算位置，
+     * 弹层一直停在 reka 的初始占位 `translate(0, -200%)` —— 画在视口上方，aria-expanded 却是 true。
+     * 现在用 `:reference="triggerEl"` 显式指定参照物；这条钉住「打开后真的被定位了」。
+     */
+    it('打开后弹层被真正定位（不停在 translate(0, -200%) 的初始占位上）', async () => {
+        await openPicker()
+        const popperWrapper = () => document.querySelector('[data-reka-popper-content-wrapper]')
+        expect(popperWrapper()).not.toBeNull()
+        await vi.waitFor(() => {
+            expect(popperWrapper().style.transform).not.toContain('-200%')
+        })
+    })
+
     it('打开就拉第一页，并且搜索框常挂（reka 的键盘导航依赖它）', async () => {
         await openPicker()
         expect(accountList).toHaveBeenCalledTimes(1)

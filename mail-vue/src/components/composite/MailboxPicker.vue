@@ -61,6 +61,12 @@ const emit = defineEmits(['select'])
 const ROW = {option: 40, label: 28}
 /** 视口 288 = 7.2 行；配合 overscan 2 把节点数压在 12 上下 */
 const VIEWPORT_MAX = 288
+/**
+ * 搜索行 + 面板内边距的高度。手机上 Picker 在底部抽屉里，上下都放不下 288 的列表 ——
+ * floating-ui 翻到上方之后面板顶部会冲出视口（搜索框整个看不见）。所以列表高度再按
+ * reka 给的可用高度 `--reka-combobox-content-available-height` 收一次，减掉这一行。
+ */
+const SEARCH_ROW = 56
 
 const {t} = useI18n()
 const route = useRoute()
@@ -73,6 +79,18 @@ const {
 } = useMailboxes()
 
 const open = ref(false)
+
+/**
+ * 弹层的定位参照物 —— 显式传给 `ComboboxContent`，不靠 `ComboboxAnchor` 注册。
+ *
+ * 触发器外面包着一层 `Tooltip`（收起侧栏时显示邮箱名）。reka 的 Tooltip 自带一个 `PopperRoot`，
+ * 而 `ComboboxAnchor` 里的 `PopperAnchor` 注入的是**离它最近**的 PopperRoot —— 也就是 Tooltip
+ * 的那个。于是锚点注册进了 Tooltip，`ComboboxRoot` 自己的 PopperRoot 永远拿不到锚点，
+ * 弹层停在 floating-ui 的初始占位 `translate(0, -200%)`，整块画在视口上方：
+ * 点了「有反应」（aria-expanded=true、焦点进了搜索框），但用户什么都看不见。
+ * `reference` 是 PopperContent 的公开 prop，优先于 rootContext.anchor。
+ */
+const triggerEl = ref(null)
 
 const currentEmail = computed(() => {
     const hit = mailboxes.find((row) => row.accountId === currentAccountId.value)
@@ -185,11 +203,14 @@ function choose(row) {
       它默认注入 `tabindex="-1"` 和 `aria-label="Show popup"`（因为 L1 那种形态里输入框
       才是控件），这里按钮本身就是控件，所以在按钮上把这两个属性写回来 ——
       reka 的 `Slot` 用 `mergeProps(attrs, childProps)`，子节点的同名属性胜出。
+      注意：外层 Tooltip 会截走 ComboboxAnchor 的锚点注册，所以弹层用 `:reference="triggerEl"`
+      显式指定参照物（见 script 里 `triggerEl` 的注释）。
     -->
     <Tooltip v-else :text="triggerLabel" :disabled="!collapsed" side="right">
       <ComboboxAnchor as-child>
         <ComboboxTrigger as-child>
           <button
+            ref="triggerEl"
             type="button"
             tabindex="0"
             :aria-label="`${t('shell.switchMailbox')} · ${triggerLabel}`"
@@ -212,6 +233,7 @@ function choose(row) {
       <ComboboxContent
         position="popper"
         align="start"
+        :reference="triggerEl"
         :side-offset="4"
         :class="cn(popoverPanelVariants({padding: 'none'}), 'w-72 overflow-hidden')"
       >
@@ -231,7 +253,7 @@ function choose(row) {
 
         <ComboboxViewport
           class="overflow-y-auto overscroll-contain p-1"
-          :style="{maxHeight: `${VIEWPORT_MAX}px`}"
+          :style="{maxHeight: `min(${VIEWPORT_MAX}px, calc(var(--reka-combobox-content-available-height, 100vh) - ${SEARCH_ROW}px))`}"
           @scroll="onScroll"
         >
           <div v-if="loading" class="grid gap-1 px-1 py-2" aria-busy="true">
