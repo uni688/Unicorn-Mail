@@ -1,10 +1,9 @@
 /**
  * 邮件列表行的纯函数格式化（P3 §7.4）。
  *
- * 这三个函数是从 `components/email-scroll/index.vue:554-583` 原样搬出来的（`htmlToText` /
- * `cleanSpace` 一个字符都没改，只是挪了位置），加上列表分组需要的 `dateGroupOf`。
- * 抽成 util 的原因：`useMailList()` 与它的单测都要用，而且 `email-scroll` 在 P3-4 换模板
- * 之前还得继续用自己那份，两边不能互相牵连。
+ * 这三个函数最早是从 `components/email-scroll/index.vue` 搬出来的，加上列表分组需要的
+ * `dateGroupOf`。P4 起 `email-scroll` 也改用这里的 `htmlToText`（它自己那份有同样的 XSS），
+ * 全仓只剩这一份实现。
  */
 import {tzDayjs} from '@/utils/day.js'
 
@@ -30,21 +29,23 @@ export function cleanSpace(text) {
 }
 
 /**
- * 取邮件正文的一行摘要。优先用 HTML（剥掉媒体标签与 script/style/title 再取 textContent），
+ * 取邮件正文的一行摘要。优先用 HTML（去掉 script/style/title 再取 textContent），
  * 没有 HTML 才退回纯文本字段。
  *
- * 注意这里是「取文本」而不是「渲染」：innerHTML 只写进一个游离的 div，从不插入文档，
- * 媒体标签在正则阶段就被删掉了，所以不会触发远程请求（阅读窗格的隔离另见 MailReader）。
+ * **必须用 `DOMParser`，不能用 `document.createElement('div').innerHTML`**（P4 验收时实测的
+ * 存储型 XSS）：游离的 div 仍属于活文档，`innerHTML` 一写下去，`<img onerror>` 就会去加载并
+ * 执行处理器 —— 不需要插入文档，也不需要用户点开。旧实现靠正则先剥媒体标签，但正则剥不干净：
+ * `<im<img>g src=x onerror=…>` 剥完正好拼回一个 `<img>`，`<input type=image>`、
+ * `<svg><image>`、`<details open ontoggle>` 根本不在清单里。邮件正文来自任何陌生人，
+ * 收件箱一刷新就会执行，而登录 token 就在 localStorage 里。
+ * `DOMParser` 出来的是惰性文档（没有浏览上下文）：不加载资源、不执行脚本、不派发事件。
+ * 阅读窗格用的是同一个原理，见 `utils/mail-sanitize.js`。
  */
 export function htmlToText(email) {
     if (email.content) {
-        const tempDiv = document.createElement('div')
-        tempDiv.innerHTML = email.content.replace(
-            /<(img|iframe|object|embed|video|audio|source|link)[^>]*>/gi, ''
-        )
-        tempDiv.querySelectorAll('script, style, title').forEach(el => el.remove())
-        const text = tempDiv.textContent || tempDiv.innerText || ''
-        return cleanSpace(text)
+        const doc = new DOMParser().parseFromString(String(email.content), 'text/html')
+        doc.querySelectorAll('script, style, title').forEach(el => el.remove())
+        return cleanSpace(doc.body?.textContent || '')
     }
     return email.text ? cleanSpace(email.text) : ''
 }

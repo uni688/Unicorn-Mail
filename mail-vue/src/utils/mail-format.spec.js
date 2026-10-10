@@ -38,9 +38,34 @@ describe('htmlToText', () => {
         expect(htmlToText(email)).toBe('正文')
     })
 
-    it('媒体标签在正则阶段就删掉（不会因为 innerHTML 触发远程请求）', () => {
+    it('媒体标签不出现在摘要里', () => {
         const email = {content: '<p>看图</p><img src="https://evil.example/a.png">'}
         expect(htmlToText(email)).toBe('看图')
+    })
+
+    /**
+     * P4 验收时在真浏览器里实测的存储型 XSS：旧实现把正文写进 `document.createElement('div')`
+     * 的 innerHTML，游离节点照样加载 `<img>` 并执行 onerror —— 收件箱一刷新就跑。
+     * jsdom 不加载资源，没法让 onerror 真的触发，所以这里钉的是「不变量」：
+     * 不可信的正文**永远不会**被写进活文档里任何元素的 innerHTML。
+     */
+    it('不可信正文绝不写进活文档的 innerHTML（只进 DOMParser 的惰性文档）', () => {
+        const payload = '<im<img>g src=x onerror="alert(1)"><details open ontoggle="alert(2)"></details><p>摘要</p>'
+        const original = Object.getOwnPropertyDescriptor(Element.prototype, 'innerHTML')
+        const writes = []
+        Object.defineProperty(Element.prototype, 'innerHTML', {
+            ...original,
+            set(value) {
+                if (this.ownerDocument === document) writes.push(String(value))
+                original.set.call(this, value)
+            },
+        })
+        try {
+            expect(htmlToText({content: payload})).toContain('摘要')
+        } finally {
+            Object.defineProperty(Element.prototype, 'innerHTML', original)
+        }
+        expect(writes.filter(v => v.includes('onerror') || v.includes('ontoggle'))).toEqual([])
     })
 
     it('没有 content 才退回 text；两者都没有返回空串', () => {

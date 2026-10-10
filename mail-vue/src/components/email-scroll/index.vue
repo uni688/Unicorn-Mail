@@ -217,6 +217,8 @@ import {fromNow} from "@/utils/day.js";
 import {useI18n} from "vue-i18n";
 import {EmailUnreadEnum} from "@/enums/email-enum.js";
 import {statusIconMap} from "@/composables/useMailList.js";
+// 摘要只用这一份实现：原来这里自己抄了一份 innerHTML 版，同样是存储型 XSS（见 mail-format.js）
+import {htmlToText} from "@/utils/mail-format.js";
 import { UseVirtualList } from '@vueuse/components'
 import { useScroll } from '@vueuse/core'
 
@@ -506,37 +508,6 @@ function getSkeletonRows() {
  * 它原本只影响标题是否分两列。
  */
 const accountShow = computed(() => false)
-
-function htmlToText(email) {
-  if (email.content) {
-
-    const tempDiv = document.createElement('div');
-
-    tempDiv.innerHTML = email.content.replace(
-        /<(img|iframe|object|embed|video|audio|source|link)[^>]*>/gi, ''
-    );
-
-    const scriptsAndStyles = tempDiv.querySelectorAll('script, style, title');
-    scriptsAndStyles.forEach(el => el.remove());
-    let text = tempDiv.textContent || tempDiv.innerText || '';
-    text = text.replace(/\s+/g, ' ').trim();
-    return cleanSpace(text)
-  }
-
-  if (email.text) {
-    return cleanSpace(email.text)
-  } else {
-    return ''
-  }
-
-}
-
-function cleanSpace(text) {
-  return text
-      .replace(/[\u200B-\u200F\uFEFF\u034F\u200B-\u200F\u00A0\u3000\u00AD]/g, '')// 移除零宽空格
-      .replace(/\s+/g, ' ')                   // 多空白合并成一个空格
-      .trim();
-}
 
 function starChange(email) {
 

@@ -196,6 +196,15 @@ function cleanCss(css, allowRemote, isInline = false, isRemote = REMOTE.test.bin
 }
 
 /**
+ * 清洗一段「声明列表」（`style` 属性的值）。给旧 `shadow-html` 用：它把 `<body style>`
+ * 单独抠出来拼进 `<style>` 块，那条路径不经过 `sanitizeEmailHtml` 的属性清洗。
+ * 调用方还要自己挡掉 `{}<>`（跳出声明块 / 样式表），这里只管 CSS 层面的那几类写法。
+ */
+export function cleanInlineStyle(css, {allowRemote = false} = {}) {
+    return cleanCss(css, allowRemote, true).css
+}
+
+/**
  * 可信来源规范化。补协议、补末尾斜杠 —— 少了斜杠时 `https://cdn.a.com` 会把
  * `https://cdn.a.com.evil.net/x.png` 也当成自家域名放行。
  */
