@@ -1756,6 +1756,30 @@ v1.1 变化说明：`views/overview/` 已删除——原「概览」按受众一
 >    `adminTable.banConfirm` 这类键名。`test/ui-i18n.spec.js` 现在会扫这些页面的静态键。
 >
 > 每处都配了「去掉修复就会失败」的用例。
+>
+> **收尾漏洞排查（2026-10-10）**：用真点击 + 真邮件在浏览器里打了一遍，又修掉两类问题：
+>
+> 1. **存储型 XSS**（`149d7d0`）：列表摘要 `htmlToText` 把正文写进游离 `div` 的 innerHTML，
+>    收件箱一刷新 `<img onerror>` 就执行（正则剥标签挡不住 `<im<img>g …>` 等写法）；
+>    旧正文页 `shadow-html` 把正文原样写进 shadow root（「全部邮件」点开即触发）。
+>    前者改 `DOMParser`，后者走 `sanitizeEmailHtml`。新阅读窗格本来就是安全的。
+> 2. **开放 API 越权**（`e9d09b1`）：封号 / 注销 / 收回角色权限对已有 Key 无效；
+>    scope 能超出角色权限（没有 `email:send` 的角色能建发信 Key）。现在每次调用都重查
+>    主人状态与角色权限，`scope ∩ 角色` 才放行。
+>
+> **给 P5 的前置结论**（按代码事实，开工前先看）：
+>
+> - `sys-setting` 的 9 张卡与表上一致：网站 / 个性化 / 邮件 / 对象存储 / 推送 /
+>   Turnstile / 公告 / Workers AI / 关于，外加 3 个 `<el-table>`（P4 有意留下）。
+> - **公告是 HTML 注入面**：`layout/main/index.vue:66` 用 `dangerouslyUseHTMLString` 渲染
+>   `noticeContent`，内容来自「公告」卡（`setting:set`）。只要站长把 `setting:set` 勾给别的
+>   角色，那个角色就能给全站每个用户推一段任意 HTML。P5 重写公告卡时，渲染端改走
+>   `sanitizeEmailHtml`（或干脆只允许纯文本 + 链接），不要原样搬。
+> - 增量 4/5（`user_setting` 表 + `/user/prefs`、`setting.bg_effect`）**一行都还没写**，
+>   迁移函数名用 `v3_3DB()`（`v3_1DB` / `v3_2DB` 已被 P3 / P4 占用）。
+> - P4 的 `DeveloperNav` 是过渡件，`SettingsShell` 接壳时删掉；四条开发者路由名不用改。
+> - 收尾前按 P4 的做法：普通用户 / 部分权限角色 / 站长三档身份在浏览器里走一遍验收线，
+>   新页面加进 `test/ui-i18n.spec.js` 的扫描清单。
 
 **风险最高的是 P3**：`email-scroll/index.vue` 1367 行里混着虚拟列表、增量拉取、右键菜单、批量选择、骨架、未读计数、自动刷新轮询（`views/email/index.vue:77-131` 的 `while(true)` 长轮询）。迁移策略是**先抽逻辑再换视图**：第一步把它拆成 `useMailList()` composable（纯逻辑，不动模板），跑通后再替换模板。这样任一步出错都能单独回退。v1.1 又给 P3 加了侧栏自定义与日期分组，因此把 `FolderTree` 排在 `MailList` 之前做——它是纯新增组件、不碰旧逻辑，可以先合并、先看到效果。v1.2 追加一条 P3 内部顺序：**`MailboxPicker` 紧跟 `FolderTree`**，因为侧栏只显示当前邮箱，没有 Picker 就无法切换邮箱，两者必须同一批上线（在此之前保留旧 `account/index.vue` 作为过渡入口）。
 
@@ -2030,6 +2054,7 @@ v1.2 变化：`⌘⇧E` 的语义明确为"打开 `MailboxPicker` 并聚焦其�
    - **v1.2 提醒**：增量 6 的 `searchByKeyword()` 必须用 Drizzle 的 `like()` 参数化写法，绝不能因为"只是个搜索"而拼字符串，否则等于在冻结第 1 条的同期又新造一个同类问题。这条已写进 §10.5 增量 6 与工程约束。
 4. （P4 验收时发现，2026-10-10）`mail-worker/src/service/user-service.js:140` — `list()` 用 `select({...user, …})`，`/user/list` 的响应里每一行都带着 `password`（哈希）与 `salt`，管理端浏览器里直接可见。建议改成显式列清单，去掉这两列。
 5. （同上）`/user/delete` → `userService.physicsDelete()` 不拦 `type=0`：带 `user:delete` 的人传站长的 `userId` 就能把站长账号连同邮箱、邮件一起物理删掉。前端已在 P4 补回「超级管理员不可勾选」（`DataTable` 的 `rowSelectable`），但那只是 UI 层，后端仍应拒绝。
+6. （同上）`physicsDelete()` 不删 `api_key` / `api_log`：被删用户的 Key 行留在库里成了孤儿。**不是越权**——P4 的 `ownerAccess` 对查不到的主人一律 401，且 `user_id` 自增不复用——只是数据卫生，随第 5 条一起改。
 
 ---
 
