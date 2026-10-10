@@ -14,7 +14,7 @@ import {afterEach, describe, expect, it} from 'vitest'
 import apiKeyService from '../src/service/api-key-service.js'
 import apiLogService from '../src/service/api-log-service.js'
 import {apiKeyConst} from '../src/const/api-const.js'
-import {insertUser, selectRow, setupEnv} from './helpers/env.js'
+import {grantRolePerms, insertUser, revokeRolePerms, selectRow, setupEnv} from './helpers/env.js'
 
 const USER = 1
 const OTHER = 2
@@ -25,6 +25,8 @@ async function seed() {
     env = await setupEnv()
     insertUser(env.sqlite, {userId: USER})
     insertUser(env.sqlite, {userId: OTHER})
+    // 创建 Key 要求角色有开发者能力（见下方「scope 不能超出角色」）；默认角色 1 不含，先勾上
+    grantRolePerms(env.sqlite, 1, ['api-key:query', 'api-key:add'])
     return env
 }
 
@@ -113,6 +115,52 @@ describe('api-key-service.add', () => {
         }
         await apiKeyService.delete(c, {keyIds: String(keys[0].keyId)}, USER)
         await expect(add(c, {name: 'again'})).resolves.toBeTruthy()
+    })
+})
+
+/**
+ * scope 只能收窄角色本来就有的能力（P4 验收时发现的越权）：建 Key 时只校验了 scope 是否
+ * 在已知清单里，没校验角色有没有对应的站内权限 —— 没有 `email:send` 的角色建一把带
+ * `email:send` 的 Key，就能绕过角色设置去 `/open/email/send` 发信。
+ */
+describe('api-key-service · scope 不能超出角色', () => {
+
+    it('角色没有 email:send → 建不出带 email:send 的 Key（403）', async () => {
+        const {c, sqlite} = await seed()
+        revokeRolePerms(sqlite, 1, ['email:send'])
+        await expect(add(c, {scopes: ['email:send']})).rejects.toMatchObject({code: 403})
+        await expect(add(c, {scopes: ['email:read', 'email:send']})).rejects.toMatchObject({code: 403})
+        // email:read 在站内本来就不卡权限，照常能建
+        await expect(add(c, {scopes: ['email:read']})).resolves.toBeTruthy()
+    })
+
+    it('角色没有 account:query → 建不出带 account:read 的 Key', async () => {
+        const {c, sqlite} = await seed()
+        revokeRolePerms(sqlite, 1, ['account:query'])
+        await expect(add(c, {scopes: ['account:read']})).rejects.toMatchObject({code: 403})
+    })
+
+    it('角色没有任何开发者权限 → 什么 scope 都建不出来', async () => {
+        const {c, sqlite} = await seed()
+        revokeRolePerms(sqlite, 1, ['api-key:query', 'api-key:add'])
+        await expect(add(c, {scopes: ['email:read']})).rejects.toMatchObject({code: 403})
+    })
+
+    it('站长（env.admin）不看角色', async () => {
+        const {c, sqlite} = await seed()
+        insertUser(sqlite, {userId: 9, email: 'admin@example.com', type: 0})
+        revokeRolePerms(sqlite, 1, ['email:send', 'account:query', 'api-key:query', 'api-key:add'])
+        await expect(add(c, {scopes: ['email:send', 'account:read']}, 9)).resolves.toBeTruthy()
+    })
+
+    it('scopeOptions 给每个 scope 标出 allowed，供前端置灰', async () => {
+        const {c, sqlite} = await seed()
+        revokeRolePerms(sqlite, 1, ['email:send'])
+        const options = await apiKeyService.scopeOptions(c, USER)
+        expect(options.map(o => [o.key, o.allowed])).toEqual([
+            ['email:read', true], ['email:send', false], ['account:read', true],
+        ])
+        expect(options[0].paths).toContain('/open/email/list')
     })
 })
 

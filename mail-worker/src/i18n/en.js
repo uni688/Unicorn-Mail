@@ -79,7 +79,11 @@ const en = {
 	apiKeyDisabled: 'API key is disabled',
 	apiKeyExpired: 'API key has expired',
 	apiKeyScopeDenied: 'API key is missing the required scope',
+	apiKeyScopeNotInRole: 'Your role does not have this permission, so a key cannot grant it',
+	apiKeyRoleNoAccess: 'Your role can no longer use the open API',
 	apiPathNotFound: 'API endpoint does not exist',
+	apiServerError: 'Server error. Check the request log for details',
+	apiSendParamsInvalid: 'accountId must be one of your mailbox ids, and receiveEmail a non-empty array of email addresses',
 	perms: {
 		"邮件": "Emails",
 		"邮件发送": "Send Email",

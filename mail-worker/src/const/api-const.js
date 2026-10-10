@@ -45,23 +45,40 @@ export const apiKeyConst = {
  * 命名沿用现有 perm key 的 `资源:动作` 形状（§5.3.5「映射到现有 perm key 体系」），
  * 但**不是** perm key 本身 —— perm 控制的是「这个角色能不能用开放 API 这个功能」，
  * scope 控制的是「这一把 Key 能碰哪些资源」，两者维度不同（见 §0.9 的口径）。
+ *
+ * `rolePerm`：站内对应接口要的 perm key（`security.js` 的 `premKey` 表）。Key 的 scope
+ * 只能**收窄**角色本来就有的能力，不能放大 —— 没有 `email:send` 的角色建一把带
+ * `email:send` 的 Key，不能因此就能发信。`null` = 站内对应接口本来就不卡权限
+ * （`/email/list` 不在 `requirePerms` 里），这里也不额外卡。
+ * 创建时（`apiKeyService.add`）和每次调用时（`api-key-auth.js`）都按它校验：
+ * 只在创建时查的话，站长事后收回角色权限，旧 Key 照样能用。
  */
 export const apiScopes = [
 	{
 		key: 'email:read',
-		paths: ['/open/email/list', '/open/email/detail', '/open/email/counts']
+		paths: ['/open/email/list', '/open/email/detail', '/open/email/counts'],
+		rolePerm: null
 	},
 	{
 		key: 'email:send',
-		paths: ['/open/email/send']
+		paths: ['/open/email/send'],
+		rolePerm: 'email:send'
 	},
 	{
 		key: 'account:read',
-		paths: ['/open/account/list']
+		paths: ['/open/account/list'],
+		rolePerm: 'account:query'
 	}
 ];
 
 export const apiScopeKeys = apiScopes.map(scope => scope.key);
+
+/**
+ * 「这个角色还能不能用开放 API」的功能开关：有其中任意一个 perm 才放行。
+ * 站长在角色页把开发者那一组全取消勾选，这个角色名下已有的 Key 就应该一起失效，
+ * 而不是要站长再一把一把地去停用（他也看不到别人的 Key）。
+ */
+export const apiAccessPerms = ['api-key:query', 'api-key:add'];
 
 /**
  * 不写 `api_log` 的路径（§4.4「探活接口不记日志」）。
@@ -72,4 +89,4 @@ export const apiLogSkipPaths = ['/open/ping'];
 /** `api_log` 保留天数（`scheduled()` 每日清理） */
 export const apiLogRetainDays = 30;
 
-export default { apiKeyConst, apiScopes, apiScopeKeys, apiLogSkipPaths, apiLogRetainDays };
+export default { apiKeyConst, apiScopes, apiScopeKeys, apiAccessPerms, apiLogSkipPaths, apiLogRetainDays };

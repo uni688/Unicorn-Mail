@@ -75,10 +75,23 @@ function background(c, promise) {
 	return task;
 }
 
-/** hono 的 404 / 业务异常都要能映射成状态码；`BizError` 默认 501 在开放 API 里当 400 用不合适 */
-function toStatus(code) {
-	const status = Number(code);
-	return Number.isInteger(status) && status >= 400 && status <= 599 ? status : 500;
+/**
+ * 异常 → 开放 API 的状态码与对外文案。
+ *
+ * - `BizError` 是业务校验（发件人不存在、额度不够…），文案本来就是给用户看的，原样返回。
+ *   它没显式给 code 时默认是 501（`error/biz-error.js`），而 HTTP 501 的意思是「服务端没实现
+ *   这个方法」，调用方会以为接口坏了 —— 这一类当 400。
+ * - 其余异常（`TypeError` 之类）是我们自己的 bug：对外只给一句「服务端出错」，原始信息只进
+ *   `api_log.err` 供用户在日志页排查，不把 `Cannot read properties of undefined` 这种内部细节
+ *   甩给第三方程序。
+ */
+function toFailure(err) {
+	if (err?.name === 'BizError') {
+		const code = Number(err.code);
+		const status = code === 501 || !Number.isInteger(code) || code < 400 || code > 599 ? 400 : code;
+		return { status, message: err.message };
+	}
+	return { status: 500, message: t('apiServerError') };
 }
 
 app.use('/open/*', async (c, next) => {
@@ -125,10 +138,25 @@ app.use('/open/*', async (c, next) => {
 	entry.keyId = keyRow.keyId;
 	entry.userId = keyRow.userId;
 
+	// Key 本身没问题，还要看主人「此刻」还配不配用它：被删 / 被封 / 角色收回了开发者能力。
+	// 站内接口靠 KV 登录态挡这些人，开放 API 不走 KV，不在这里查就等于封号对 Key 无效
+	const access = await apiKeyService.ownerAccess(c, keyRow.userId);
+
+	if (!access.ok) {
+		if (access.reason === 'gone') return deny(401, t('apiKeyInvalid'));
+		if (access.reason === 'banned') return deny(403, t('isBanUser'));
+		return deny(403, t('apiKeyRoleNoAccess'));
+	}
+
 	const needed = requiredScopes(c.req.path);
 
 	if (needed && !needed.some(key => keyRow.scopes.includes(key))) {
 		return deny(403, t('apiKeyScopeDenied'));
+	}
+
+	// scope 只能收窄、不能放大：Key 勾了 email:send，但角色已经没有 email:send，照样不给
+	if (needed && !needed.some(key => keyRow.scopes.includes(key) && apiKeyService.scopeAllowed(key, access))) {
+		return deny(403, t('apiKeyScopeNotInRole'));
 	}
 
 	// 下游 service 一律通过 `userContext.getUserId(c)` 取身份，和站内接口同一条路径。
@@ -160,11 +188,12 @@ app.use('/open/*', async (c, next) => {
 
 	if (err) {
 
-		const status = toStatus(err.code);
-		const message = err.message ?? String(err);
+		const { status, message } = toFailure(err);
+		// 日志里记原始信息（用户在日志页能看到具体原因），响应里只给对外文案
+		const detail = err?.message ?? String(err);
 
 		background(c, Promise.all([
-			apiLogService.add(c, { ...entry, status, duration, err: message }),
+			apiLogService.add(c, { ...entry, status, duration, err: detail }),
 			apiKeyService.touch(c, keyRow.keyId)
 		]));
 

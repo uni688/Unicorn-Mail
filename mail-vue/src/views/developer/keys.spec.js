@@ -193,6 +193,29 @@ describe('Keys 创建 · 先本地拦一遍', () => {
         expect(api.add).toHaveBeenCalledWith({name: 'ci', scopes: 'email:read', expireDays: 30})
         wrapper.unmount()
     })
+
+    it('身份没有的 scope（allowed=false）置灰并说明原因，点了也勾不上', async () => {
+        api.scopes.mockResolvedValue([
+            {key: 'email:read', paths: ['/open/email/list'], allowed: true},
+            {key: 'email:send', paths: ['/open/email/send'], allowed: false},
+        ])
+        const wrapper = await mountKeys()
+        await openAdd(wrapper)
+
+        const box = (label) => [...document.querySelectorAll('[role="dialog"] button[role="checkbox"]')]
+            .find((el) => el.closest('label, div')?.textContent.includes(label))
+        expect(box('email:read').disabled).toBe(false)
+        expect(box('email:send').disabled).toBe(true)
+        expect(document.querySelector('[role="dialog"]').textContent).toContain('developer.scopeNotInRole')
+
+        box('email:send').click()
+        await flush()
+        await typeInBody('input[maxlength="30"]', 'ci')
+        await clickInBody('email:read')
+        await clickInBody('add')
+        expect(api.add).toHaveBeenCalledWith({name: 'ci', scopes: 'email:read', expireDays: 30})
+        wrapper.unmount()
+    })
 })
 
 describe('Keys 创建 · 一次性明文（§5.3.5）', () => {

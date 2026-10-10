@@ -2,7 +2,6 @@ import app from '../hono/hono';
 import result from '../model/result';
 import apiKeyService from '../service/api-key-service';
 import userContext from '../security/user-context';
-import { apiScopes } from '../const/api-const';
 
 /**
  * P4（§5.3.5 / §10.5）：开放 API 的 Key 管理。
@@ -48,5 +47,6 @@ app.get('/apiKey/usage', async (c) => {
  * ——scope 加一个、前端忘了加，用户就永远勾不到那一项。
  */
 app.get('/apiKey/scopes', async (c) => {
-	return c.json(result.ok(apiScopes.map(scope => ({ key: scope.key, paths: scope.paths }))));
+	// 每项带 `allowed`：角色没有对应站内权限的 scope 勾了也建不出来，前端置灰并说明原因
+	return c.json(result.ok(await apiKeyService.scopeOptions(c, userContext.getUserId(c))));
 });

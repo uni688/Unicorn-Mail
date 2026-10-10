@@ -5,9 +5,11 @@ import { and, count, desc, eq, gte, inArray, sql } from 'drizzle-orm';
 import BizError from '../error/biz-error';
 import saltHashUtils from '../utils/crypto-utils';
 import { formatDetailDate, toUtc } from '../utils/date-uitil';
-import { apiKeyConst, apiScopeKeys } from '../const/api-const';
-import { isDel } from '../const/entity-const';
+import { apiAccessPerms, apiKeyConst, apiScopeKeys, apiScopes } from '../const/api-const';
+import { isDel, userConst } from '../const/entity-const';
 import { t } from '../i18n/i18n';
+import userService from './user-service';
+import permService from './perm-service';
 
 /**
  * P4（§5.3.5 / §10.5 / §4.4）：开放 API 的 Key 管理。
@@ -66,10 +68,68 @@ function parseScopes(raw) {
 	return [...new Set(String(raw ?? '').split(',').map(item => item.trim()).filter(item => apiScopeKeys.includes(item)))];
 }
 
+/** 这个 scope 在站内对应的 perm，当前角色有没有。`rolePerm` 为 null 的 scope 不卡 */
+function scopeAllowed(scopeKey, access) {
+	if (access.admin) return true;
+	const scope = apiScopes.find(item => item.key === scopeKey);
+	return !!scope && (!scope.rolePerm || access.permKeys.includes(scope.rolePerm));
+}
+
 const apiKeyService = {
 
 	toPrefix,
 	parseScopes,
+	scopeAllowed,
+
+	/**
+	 * Key 主人**此刻**的状态与权限（鉴权中间件每次调用都查一次）。
+	 *
+	 * 站内接口靠 KV 里的登录态挡住被封 / 被删的人（`setStatus` 封号时会删 `AUTH_INFO`），
+	 * 开放 API 不走 KV，所以这几件事只能在这里重新判一遍：
+	 *   - 用户不在了（物理删除）或已注销（`is_del`）→ `gone`；
+	 *   - 被封禁 → `banned`；
+	 *   - 角色已经没有开发者能力（`apiAccessPerms` 一个都不剩）→ `noAccess`。
+	 * `env.admin` 与站内一样是逃逸口：不看角色。
+	 *
+	 * @returns {Promise<{ok: true, admin: boolean, permKeys: string[]} | {ok: false, reason: 'gone'|'banned'|'noAccess'}>}
+	 */
+	async ownerAccess(c, userId) {
+
+		const userRow = await userService.selectById(c, userId);
+
+		if (!userRow) {
+			return { ok: false, reason: 'gone' };
+		}
+
+		if (userRow.status === userConst.status.BAN) {
+			return { ok: false, reason: 'banned' };
+		}
+
+		if (userRow.email === c.env.admin) {
+			return { ok: true, admin: true, permKeys: [] };
+		}
+
+		const permKeys = await permService.userPermKeys(c, userId);
+
+		if (!apiAccessPerms.some(key => permKeys.includes(key))) {
+			return { ok: false, reason: 'noAccess' };
+		}
+
+		return { ok: true, admin: false, permKeys };
+	},
+
+	/**
+	 * 创建表单用的 scope 清单：每项多一个 `allowed`，告诉前端哪些勾了也没用。
+	 * 角色查不到权限（理论上进不来这个接口）时一律 `allowed: false`，不猜。
+	 */
+	async scopeOptions(c, userId) {
+		const access = await this.ownerAccess(c, userId);
+		return apiScopes.map(scope => ({
+			key: scope.key,
+			paths: scope.paths,
+			allowed: access.ok ? scopeAllowed(scope.key, access) : false
+		}));
+	},
 
 	/**
 	 * 创建。返回值里的 `key` 是**唯一一次**能拿到明文的机会（§5.3.5）。
@@ -94,6 +154,13 @@ const apiKeyService = {
 
 		if (scopes.length === 0) {
 			throw new BizError(t('emptyApiKeyScope'));
+		}
+
+		// scope 只能收窄角色已有的能力：没有 email:send 的角色不能靠一把 Key 发信
+		const access = await this.ownerAccess(c, userId);
+
+		if (!access.ok || scopes.some(scope => !scopeAllowed(scope, access))) {
+			throw new BizError(t('apiKeyScopeNotInRole'), 403);
 		}
 
 		const { total } = await orm(c).select({ total: count() }).from(apiKey)

@@ -377,12 +377,14 @@ async function runConfirm() {
 
         <Field :label="t('developer.keyScopes')" :hint="t('developer.keyScopesHint')" required>
           <div class="grid gap-2 rounded-md border border-line p-3">
+            <!-- `allowed === false`：你的身份没有对应的站内权限，勾了服务端也会拒（scope 只能收窄、不能放大） -->
             <Checkbox
               v-for="scope in scopeOptions"
               :key="scope.key"
               :model-value="addForm.scopes.includes(scope.key)"
               :label="scope.key"
-              :hint="scope.paths?.join('  ')"
+              :hint="scope.allowed === false ? t('developer.scopeNotInRole') : scope.paths?.join('  ')"
+              :disabled="scope.allowed === false"
               size="sm"
               @update:model-value="toggleScope(scope.key, $event)"
             />

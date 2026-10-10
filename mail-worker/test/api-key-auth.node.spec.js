@@ -22,7 +22,9 @@ import app from '../src/hono/webs.js'
 import apiKeyService from '../src/service/api-key-service.js'
 import apiLogService from '../src/service/api-log-service.js'
 import {t} from '../src/i18n/i18n.js'
-import {countRows, insertAccount, insertEmail, insertUser, selectRow, setupEnv} from './helpers/env.js'
+import {
+    countRows, grantRolePerms, insertAccount, insertEmail, insertUser, revokeRolePerms, selectRow, setupEnv,
+} from './helpers/env.js'
 
 const USER = 1
 const OTHER = 2
@@ -44,6 +46,8 @@ async function seed() {
     const {sqlite} = env
     insertUser(sqlite, {userId: USER})
     insertUser(sqlite, {userId: OTHER})
+    // 默认角色 1 已有 email:send / account:query，但没有任何开发者权限；开放 API 的前提是它
+    grantRolePerms(sqlite, 1, ['api-key:query', 'api-key:add'])
     insertAccount(sqlite, {accountId: USER, userId: USER, email: 'mine@example.com'})
     insertAccount(sqlite, {accountId: OTHER, userId: OTHER, email: 'theirs@example.com'})
     insertEmail(sqlite, {emailId: MINE, userId: USER, accountId: USER, subject: '我的'})
@@ -251,10 +255,10 @@ describe('api-key-auth 的 403 分支（scope）', () => {
         await seed()
         const created = await createKey(['email:send'])
 
-        const {res} = await call('/open/email/send', {key: created.key, method: 'POST', body: {}})
-        // 空 body 会被 emailService.send 拦住，但那是业务校验；只要不是 403 就说明闸门开了
-        expect(res.status).not.toBe(403)
-        expect(res.status).not.toBe(401)
+        const {res, json} = await call('/open/email/send', {key: created.key, method: 'POST', body: {}})
+        // 空 body 被入参校验挡成 400；只要不是 401 / 403 就说明闸门开了
+        expect(res.status).toBe(400)
+        expect(json.message).toBe(t('apiSendParamsInvalid'))
     })
 
     /**
@@ -281,6 +285,140 @@ describe('api-key-auth 的 403 分支（scope）', () => {
         await seed()
         const {res} = await call('/open/ping')
         expect(res.status).toBe(401)
+    })
+})
+
+/**
+ * Key 主人「此刻」的状态（P4 验收时发现的越权）。站内接口靠 KV 登录态挡住被封 / 被删的人，
+ * 开放 API 不走 KV —— 之前 `verifyPlainKey` 只看 Key 自己，于是封号、注销、收回角色权限
+ * 对已经发出去的 Key 全都无效。这几条用 `/open/email/list` 打：它在站内不卡 perm，
+ * 拦住它的只能是这一层。
+ */
+describe('api-key-auth 的主人状态与角色权限', () => {
+
+    it('主人被封禁 → 403「已禁用」，并记日志', async () => {
+        const {sqlite} = await seed()
+        const created = await createKey(['email:read'])
+        sqlite.prepare(`UPDATE user SET status = 1 WHERE user_id = ?`).run(USER)
+
+        const {res, json, tasks} = await call('/open/email/list', {key: created.key})
+        expect(res.status).toBe(403)
+        expect(json.message).toBe(t('isBanUser'))
+        await flush(tasks)
+        expect(logRows(sqlite).at(-1)).toMatchObject({status: 403, key_id: created.keyId, user_id: USER})
+    })
+
+    it('主人已注销（is_del）或被物理删除 → 401「密钥无效」', async () => {
+        const {sqlite} = await seed()
+        const created = await createKey(['email:read'])
+        sqlite.prepare(`UPDATE user SET is_del = 1 WHERE user_id = ?`).run(USER)
+        expect((await call('/open/email/list', {key: created.key})).res.status).toBe(401)
+
+        sqlite.prepare(`DELETE FROM user WHERE user_id = ?`).run(USER)
+        const {res, json} = await call('/open/ping', {key: created.key})
+        expect(res.status).toBe(401)
+        expect(json.message).toBe(t('apiKeyInvalid'))
+    })
+
+    it('站长收回角色的开发者权限 → 已有 Key 一起失效（连探活都不行）', async () => {
+        const {sqlite} = await seed()
+        const created = await createKey(['email:read'])
+        expect((await call('/open/email/list', {key: created.key})).res.status).toBe(200)
+
+        revokeRolePerms(sqlite, 1, ['api-key:query', 'api-key:add'])
+        const list = await call('/open/email/list', {key: created.key})
+        expect(list.res.status).toBe(403)
+        expect(list.json.message).toBe(t('apiKeyRoleNoAccess'))
+        expect((await call('/open/ping', {key: created.key})).res.status).toBe(403)
+    })
+
+    it('Key 勾了 email:send，但角色事后被收回 email:send → 403，不进 emailService.send', async () => {
+        const {sqlite} = await seed()
+        const created = await createKey(['email:send'])
+        revokeRolePerms(sqlite, 1, ['email:send'])
+
+        const {res, json} = await call('/open/email/send', {key: created.key, method: 'POST', body: {}})
+        expect(res.status).toBe(403)
+        expect(json.message).toBe(t('apiKeyScopeNotInRole'))
+    })
+
+    it('account:read 对应站内 account:query：角色收回后 /open/account/list 不再可用', async () => {
+        const {sqlite} = await seed()
+        const created = await createKey(['account:read'])
+        revokeRolePerms(sqlite, 1, ['account:query'])
+        const {res, json} = await call('/open/account/list', {key: created.key})
+        expect(res.status).toBe(403)
+        expect(json.message).toBe(t('apiKeyScopeNotInRole'))
+    })
+
+    it('站长（env.admin）不看角色：角色权限全收回也照常可用', async () => {
+        const {sqlite} = await seed()
+        insertUser(sqlite, {userId: 9, email: 'admin@example.com', type: 0})
+        insertAccount(sqlite, {accountId: 9, userId: 9, email: 'admin@example.com'})
+        const created = await createKey(['email:read', 'account:read'], 9)
+        revokeRolePerms(sqlite, 1, ['api-key:query', 'api-key:add', 'account:query'])
+
+        expect((await call('/open/email/list', {key: created.key})).res.status).toBe(200)
+        expect((await call('/open/account/list', {key: created.key})).res.status).toBe(200)
+    })
+})
+
+/**
+ * 开放 API 的调用方是任意程序：入参不全不能变成 500，内部异常的原文也不能甩给它们。
+ * 之前空 body 打 `/open/email/send` 会在 `receiveEmail.every` 上抛 TypeError，
+ * 响应是 500 + `Cannot read properties of undefined (reading 'every')`。
+ */
+describe('api-key-auth 的错误映射', () => {
+
+    it.each([
+        ['空 body', {}],
+        ['receiveEmail 不是数组', {accountId: USER, receiveEmail: 'a@b.com'}],
+        ['receiveEmail 是空数组', {accountId: USER, receiveEmail: []}],
+        ['receiveEmail 里有非法邮箱', {accountId: USER, receiveEmail: ['not-an-email']}],
+        ['accountId 不是整数', {accountId: 'x', receiveEmail: ['a@b.com']}],
+    ])('/open/email/send 入参不对（%s）→ 400', async (_name, body) => {
+        await seed()
+        const created = await createKey(['email:send'])
+        const {res, json} = await call('/open/email/send', {key: created.key, method: 'POST', body})
+        expect(res.status).toBe(400)
+        expect(json.message).toBe(t('apiSendParamsInvalid'))
+    })
+
+    it('非业务异常 → 500 + 通用文案；原始信息只进日志', async () => {
+        const {sqlite} = await seed()
+        const created = await createKey(['email:read'])
+        const emailService = (await import('../src/service/email-service.js')).default
+        vi.spyOn(emailService, 'counts').mockRejectedValue(new TypeError('boom: internal detail'))
+
+        const {res, json, tasks} = await call('/open/email/counts?all=1', {key: created.key})
+        expect(res.status).toBe(500)
+        expect(json.message).toBe(t('apiServerError'))
+        expect(JSON.stringify(json)).not.toContain('internal detail')
+
+        await flush(tasks)
+        expect(logRows(sqlite).at(-1)).toMatchObject({status: 500, err: 'boom: internal detail'})
+    })
+
+    it('没给 code 的 BizError（默认 501）→ 400，文案原样', async () => {
+        await seed()
+        const created = await createKey(['email:read'])
+        const emailService = (await import('../src/service/email-service.js')).default
+        const BizError = (await import('../src/error/biz-error.js')).default
+        vi.spyOn(emailService, 'counts').mockRejectedValue(new BizError('业务上不行'))
+
+        const {res, json} = await call('/open/email/counts?all=1', {key: created.key})
+        expect(res.status).toBe(400)
+        expect(json.message).toBe('业务上不行')
+    })
+
+    it('显式 403 的 BizError 保持 403（例如角色禁止发件）', async () => {
+        await seed()
+        const created = await createKey(['email:read'])
+        const emailService = (await import('../src/service/email-service.js')).default
+        const BizError = (await import('../src/error/biz-error.js')).default
+        vi.spyOn(emailService, 'counts').mockRejectedValue(new BizError('不给', 403))
+
+        expect((await call('/open/email/counts?all=1', {key: created.key})).res.status).toBe(403)
     })
 })
 

@@ -622,6 +622,7 @@ const zh = {
         emptyKeyName: '名称不能留空',
         emptyKeyScope: '至少要勾一项权限范围',
         scopesUnavailable: '权限清单没能加载出来，稍后重试',
+        scopeNotInRole: '你的身份没有这项权限，Key 不能比身份给得更多',
         delKeyHint: '用这把 Key 的程序会立刻失效。历史请求日志会保留。',
         delKeysConfirm: '确认删除选中的 {n} 把 Key 吗？',
         keyGone: 'Key 已删除（#{id}）',

@@ -66,6 +66,27 @@ export function insertUser(sqlite, {userId, email = `u${userId}@example.com`, ty
     return userId
 }
 
+/**
+ * 给角色勾上若干 perm key（按 `perm.perm_key` 查 id，迁移链里已经种好了 perm 表）。
+ * 迁移链的默认角色 1 不含任何 `api-key:*`（站长自己去勾），开放 API 的用例要先勾上。
+ */
+export function grantRolePerms(sqlite, roleId, permKeys) {
+    for (const key of permKeys) {
+        const row = sqlite.prepare(`SELECT perm_id FROM perm WHERE perm_key = ?`).get(key)
+        if (!row) throw new Error(`perm 表里没有 ${key}`)
+        sqlite.prepare(`INSERT INTO role_perm (role_id, perm_id) VALUES (?, ?)`).run(roleId, row.perm_id)
+    }
+}
+
+/** 收回角色的某些 perm key */
+export function revokeRolePerms(sqlite, roleId, permKeys) {
+    for (const key of permKeys) {
+        sqlite.prepare(
+            `DELETE FROM role_perm WHERE role_id = ? AND perm_id = (SELECT perm_id FROM perm WHERE perm_key = ?)`,
+        ).run(roleId, key)
+    }
+}
+
 export function insertAccount(sqlite, {accountId, userId, email, allReceive = 0, isDel = 0, name = ''} = {}) {
     sqlite.prepare(
         `INSERT INTO account (account_id, email, name, user_id, all_receive, is_del, sort, status)

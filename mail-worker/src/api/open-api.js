@@ -4,6 +4,7 @@ import emailService from '../service/email-service';
 import accountService from '../service/account-service';
 import userContext from '../security/user-context';
 import BizError from '../error/biz-error';
+import verifyUtils from '../utils/verify-utils';
 import { t } from '../i18n/i18n';
 
 /**
@@ -81,7 +82,20 @@ app.get('/open/email/counts', async (c) => {
  * 站内/站外判定、附件处理全都照常生效 —— 开放 API 不是一条绕过发件限制的旁路。
  */
 app.post('/open/email/send', async (c) => {
-	const email = await emailService.send(c, await c.req.json(), userContext.getUserId(c));
+
+	const params = await c.req.json().catch(() => null);
+
+	// 站内的写信页总会带齐这两项，`emailService.send` 就没做入参校验 —— 缺了直接
+	// `receiveEmail.every` 抛 TypeError。开放 API 的调用方是任意程序，这里先挡成 400
+	const receivers = params?.receiveEmail;
+	const validReceivers = Array.isArray(receivers) && receivers.length > 0
+		&& receivers.every(item => typeof item === 'string' && verifyUtils.isEmail(item));
+
+	if (!params || !Number.isInteger(Number(params.accountId)) || !validReceivers) {
+		throw new BizError(t('apiSendParamsInvalid'), 400);
+	}
+
+	const email = await emailService.send(c, {...params, accountId: Number(params.accountId)}, userContext.getUserId(c));
 	return c.json(result.ok(email));
 });
 

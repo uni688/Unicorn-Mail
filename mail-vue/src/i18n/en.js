@@ -618,6 +618,7 @@ const en = {
         emptyKeyName: 'The name cannot be empty',
         emptyKeyScope: 'Pick at least one scope',
         scopesUnavailable: 'Could not load the scope list. Try again in a moment',
+        scopeNotInRole: 'Your role does not have this permission, and a key cannot grant more than your role',
         delKeyHint: 'Anything using this key stops working immediately. Past request logs are kept.',
         delKeysConfirm: 'Delete the {n} selected keys?',
         keyGone: 'Key deleted (#{id})',

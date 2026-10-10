@@ -79,7 +79,11 @@ const zh = {
 	apiKeyDisabled: '密钥已停用',
 	apiKeyExpired: '密钥已过期',
 	apiKeyScopeDenied: '密钥没有该接口的权限范围',
+	apiKeyScopeNotInRole: '你的身份没有这项权限，不能通过密钥使用',
+	apiKeyRoleNoAccess: '你的身份已不能使用开放 API',
 	apiPathNotFound: '接口不存在',
+	apiServerError: '服务端出错，详情见请求日志',
+	apiSendParamsInvalid: 'accountId 须为你名下的邮箱 id，receiveEmail 须为非空的邮箱数组',
 	perms: {
 		"邮件": "邮件",
 		"邮件发送": "邮件发送",
