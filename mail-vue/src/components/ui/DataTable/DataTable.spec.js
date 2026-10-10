@@ -186,6 +186,54 @@ describe('DataTable · 选择模型（§7.4）', () => {
     })
 })
 
+/**
+ * `rowSelectable`：`el-table` 的 `:selectable` 等价物。用户管理页靠它把超级管理员排除在
+ * 批量删除之外 —— 后端 `/user/delete` 不拦 type=0，前端这一道就是全部的保护。
+ * 这里用 id=2 当「不能勾」的那一行，从点击、Shift 连选、Space、表头全选四条路去试。
+ */
+describe('DataTable · 不可勾选的行（rowSelectable）', () => {
+    const notTwo = (row) => row.id !== 2
+    const setup = (source = ROWS) => {
+        const selection = useSelection(ref(source), {idKey: 'id'})
+        return {selection, wrapper: render({selectable: true, selection, rowSelectable: notTwo})}
+    }
+    const rowBoxes = (wrapper) => table(wrapper).findAll('tbody [role="checkbox"], tbody button[aria-label="选择此行"]')
+    const head = (wrapper) => wrapper.get('thead [role="checkbox"], thead button[aria-label="全选本页"]')
+
+    it('那一行的复选框是禁用的，点了也不进选中集合', async () => {
+        const {selection, wrapper} = setup()
+        expect(rowBoxes(wrapper).map((b) => b.attributes('disabled') !== undefined)).toEqual([false, true, false])
+        await rowBoxes(wrapper)[1].trigger('click')
+        expect(selection.ids.value).toEqual([])
+    })
+
+    it('Space 也选不中它', async () => {
+        const {selection, wrapper} = setup()
+        await bodyRows(wrapper)[1].trigger('keydown', {key: ' '})
+        expect(selection.ids.value).toEqual([])
+    })
+
+    it('Shift 连选跨过它时，它不会被夹带进来', async () => {
+        const {selection, wrapper} = setup()
+        await rowBoxes(wrapper)[0].trigger('click')
+        await rowBoxes(wrapper)[2].trigger('click', {shiftKey: true})
+        expect([...selection.ids.value].sort()).toEqual([1, 3])
+    })
+
+    it('表头全选只选可勾的行；数据源同样过滤时表头是「全选」而不是「半选」', async () => {
+        const {selection, wrapper} = setup(ROWS.filter(notTwo))
+        await head(wrapper).trigger('click')
+        expect([...selection.ids.value].sort()).toEqual([1, 3])
+        expect(head(wrapper).attributes('data-state')).toBe('checked')
+    })
+
+    it('数据源没过滤时，表头全选同样不会带上它（DataTable 自己兜底）', async () => {
+        const {selection, wrapper} = setup(ROWS)
+        await head(wrapper).trigger('click')
+        expect([...selection.ids.value].sort()).toEqual([1, 3])
+    })
+})
+
 describe('DataTable · 排序（服务端优先）', () => {
     it('只有 sortable 的列有排序按钮，其余列没有假箭头', () => {
         const th = headers(render())

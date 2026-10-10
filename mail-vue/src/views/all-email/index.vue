@@ -27,7 +27,7 @@
           <Select
               v-model="params.searchType"
               :options="searchTypeOptions"
-              :aria-label="t('searchScope')"
+              :aria-label="t('adminTable.searchScope')"
               size="sm"
               class="scope-select"
               @update:model-value="onScopeChange"
@@ -52,12 +52,12 @@
             class="status-select"
             @update:model-value="typeSelectChange"
         />
-        <Button variant="ghost" size="icon-sm" :label="t('search')" @click="search">
+        <Button variant="ghost" size="icon-sm" :label="t('ui.search')" @click="search">
           <Icon icon="iconoir:search" width="20" height="20"/>
         </Button>
         <Button variant="ghost"
                 size="icon-sm"
-                :label="params.timeSort === 0 ? t('shell.oldestFirst') : t('shell.newestFirst')"
+                :label="params.timeSort === 0 ? t('mail.oldestFirst') : t('mail.newestFirst')"
                 @click="changeTimeSort">
           <Icon v-if="params.timeSort === 0" icon="material-symbols-light:timer-arrow-down-outline" width="24" height="24"/>
           <Icon v-else icon="material-symbols-light:timer-arrow-up-outline" width="24" height="24"/>

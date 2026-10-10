@@ -70,6 +70,41 @@ describe('每条文案都能被 vue-i18n 编译', () => {
     })
 })
 
+describe('P4 管理域 / 开发者页面用到的键在两种语言里都存在', () => {
+    /**
+     * 缺键时 vue-i18n 原样返回键名，页面不报错，只会在界面上露出 `adminTable.banConfirm`
+     * 这种字符串 —— P4 验收时用户页就是这样：封禁 / 删除的确认框标题和说明全是键名，
+     * 列表的 aria-label 念出来是 `userManage`。组件单测一律 mock 掉 `t`，所以测不到。
+     *
+     * 这里只扫**静态**键（`t('a.b')` / `$t('a.b')`），拼出来的键（`t(c.labelKey)`）不管。
+     * 范围限定在 P4 迁移过的页面；旧页面另有存量缺口，留给 P6 的「zh/en diff 为 0」。
+     */
+    const FILES = import.meta.glob([
+        '/src/views/{user,role,reg-key,all-email,draft}/index.vue',
+        '/src/views/developer/*.vue',
+        '/src/components/email-scroll/index.vue',
+        '/src/components/composite/DeveloperNav.vue',
+        '/src/composables/useUserAdmin.js',
+    ], {query: '?raw', import: 'default', eager: true})
+
+    const resolve = (obj, key) => key.split('.').reduce((acc, part) => (acc == null ? acc : acc[part]), obj)
+    const KEY_RE = /\$?\bt\(\s*['"`]([\w.]+)['"`]/g
+
+    it('扫到了文件（glob 写错时这条先失败，而不是下面那条空跑通过）', () => {
+        expect(Object.keys(FILES).length).toBeGreaterThanOrEqual(10)
+    })
+
+    it.each([['zh', zh], ['en', en]])('%s：没有缺键', (_lang, messages) => {
+        const missing = []
+        for (const [file, text] of Object.entries(FILES)) {
+            for (const [, key] of text.matchAll(KEY_RE)) {
+                if (typeof resolve(messages, key) !== 'string') missing.push(`${file.replace('/src/', '')}: ${key}`)
+            }
+        }
+        expect([...new Set(missing)]).toEqual([])
+    })
+})
+
 describe('resolveUiText', () => {
     it('没有 translate 时用兜底文案', () => {
         expect(resolveUiText(null, 'close')).toBe(UI_TEXT_FALLBACK.close)

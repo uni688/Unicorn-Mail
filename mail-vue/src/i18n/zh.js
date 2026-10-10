@@ -564,6 +564,27 @@ const zh = {
         banEmailPlaceholder: "spam{'@'}example.com, example.com, *",
         availDomainHint: '不选就是全部域名都能用',
         availDomainAll: '全部域名',
+        /* 注册码页：重新生成注册码（图标按钮的可访问名） */
+        regenerate: '重新生成',
+        /* 用户页。删除是物理删除（`userService.physicsDelete`：账号 + 名下邮箱 + 邮件），提示要说清删不回来 */
+        emptyUser: '还没有用户',
+        emptyUserHint: '新用户注册后会出现在这里，也可以直接手动添加。',
+        filterCount: '筛选「{name}」的统计口径',
+        delUsersConfirm: '确认删除选中的 {n} 个用户吗？',
+        delUserHint: '会连同名下的邮箱和邮件一起永久删除，无法恢复。',
+        banConfirm: '确认封禁 {msg} 吗？',
+        banHint: '封禁后会立刻退出登录，之后也无法再登录，随时可以解封。',
+        restoreConfirm: '确认恢复 {msg} 吗？',
+        restoreHint: '恢复账号和主邮箱；其余已删除的邮箱和邮件不会一起回来。',
+        pwdHint: '至少 6 位',
+        emptyAccount: '这个用户还没有邮箱',
+        trustLevel: '等级',
+        /* 全部邮件页 */
+        searchScope: '搜索范围',
+        mailTypeFilter: '邮件类型',
+        clearEmailHint: '按条件找出匹配的邮件并永久删除。条件留空表示不限。',
+        dateRange: '时间范围',
+        matchMode: '匹配方式',
     },
     /* 登录 / 注册 / 绑定 / OAuth 回调（§5.3）。旧登录页已有的文案继续用顶层键，
        这里只补新增的四个视图需要、旧页面没有的部分。 */
@@ -666,7 +687,8 @@ const zh = {
         errorShape: '出错时返回的还是 JSON：code 不等于 200，message 里是原因。',
         endpointsTitle: '接口',
         endpointsDesc: '点开每条看参数和示例。示例里的 Key 换成你自己的就能直接跑。',
-        noScope: '无需授权',
+        /* 仍然要带有效 Key，只是不查 scope；写成「无需授权」会让人以为裸调也行 */
+        noScope: '无需权限范围',
         paramsTitle: '参数',
         paramName: '参数',
         paramIn: '位置',

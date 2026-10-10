@@ -560,6 +560,27 @@ const en = {
         banEmailPlaceholder: "spam{'@'}example.com, example.com, *",
         availDomainHint: 'Leave empty to allow every domain',
         availDomainAll: 'All domains',
+        /* Registration keys page: regenerate the key (accessible name of an icon button) */
+        regenerate: 'Regenerate',
+        /* Users page. Deletion is physical (account + its mailboxes + mail), so say it can't be undone */
+        emptyUser: 'No users yet',
+        emptyUserHint: 'New sign-ups show up here. You can also add one by hand.',
+        filterCount: 'Choose what "{name}" counts',
+        delUsersConfirm: 'Delete the {n} selected users?',
+        delUserHint: 'Their mailboxes and mail are deleted with them, for good.',
+        banConfirm: 'Ban {msg}?',
+        banHint: 'They are signed out right away and can no longer sign in. You can lift it at any time.',
+        restoreConfirm: 'Restore {msg}?',
+        restoreHint: 'Restores the account and its primary mailbox. Other deleted mailboxes and mail stay deleted.',
+        pwdHint: 'At least 6 characters',
+        emptyAccount: 'This user has no mailboxes yet',
+        trustLevel: 'Level',
+        /* All mail page */
+        searchScope: 'Search in',
+        mailTypeFilter: 'Mail type',
+        clearEmailHint: 'Finds matching mail and deletes it for good. Leave a field empty to match anything.',
+        dateRange: 'Date range',
+        matchMode: 'Match',
     },
     /* Sign in / sign up / bind / OAuth callback (§5.3). Copy that already exists on the
        legacy login view keeps its top-level keys; only the new bits live here. */

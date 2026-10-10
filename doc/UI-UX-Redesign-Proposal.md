@@ -1741,6 +1741,21 @@ v1.1 变化说明：`views/overview/` 已删除——原「概览」按受众一
 >    JWT 中间件，必须 `exclude[]` 追加 `'/open'` 后另挂一个中间件（`a9b9239`）。
 >
 > P4 实际拆成 8 个 commit（`05d4cc8` → `859806a`）+ 本次文档回填。
+>
+> **浏览器验收（2026-10-10）**：普通用户 / 只读开发者身份 / 站长三档各走一遍。三条验收线都过了
+> （权限裁剪：前端路由 + 按钮 + 后端 403 三层一致；分页 / 筛选 / 批量：用户页搜索、全选、批量删除；
+> Key：创建 → 一次性明文 → scope 内 200 / scope 外 403 → 日志 → 停用 401 → 删除 401），
+> 但当场修了 4 处单测与 build 都没拦住的问题：
+>
+> 1. `email-scroll` 用了 `statusIconMap` 却没 import（`0c4c686`），草稿箱与「全部邮件」**永远是空列表**。
+> 2. 用户页 `:error="errorDetail"`：`DataTable` 的 `error` 是 `[Boolean, String, …]`，Vue 把空串强转成
+>    `true`，**用户列表与用户邮箱弹窗永远卡在错误态**。另外三页早就写成 `errorDetail || Boolean(error)`。
+> 3. `el-table` 的 `:selectable="row => row.type !== 0"` 在迁移时丢了（`DataTable` 没有逐行可选），
+>    **全选 + 批量删除会带上站长**，而后端不拦（附录 C 第 5 条）。补了 `DataTable` 的 `rowSelectable`。
+> 4. 用户页 14 个、全部邮件页 8 个、`email-scroll` 2 个、注册码页 1 个 i18n 键不存在，界面上直接露出
+>    `adminTable.banConfirm` 这类键名。`test/ui-i18n.spec.js` 现在会扫这些页面的静态键。
+>
+> 每处都配了「去掉修复就会失败」的用例。
 
 **风险最高的是 P3**：`email-scroll/index.vue` 1367 行里混着虚拟列表、增量拉取、右键菜单、批量选择、骨架、未读计数、自动刷新轮询（`views/email/index.vue:77-131` 的 `while(true)` 长轮询）。迁移策略是**先抽逻辑再换视图**：第一步把它拆成 `useMailList()` composable（纯逻辑，不动模板），跑通后再替换模板。这样任一步出错都能单独回退。v1.1 又给 P3 加了侧栏自定义与日期分组，因此把 `FolderTree` 排在 `MailList` 之前做——它是纯新增组件、不碰旧逻辑，可以先合并、先看到效果。v1.2 追加一条 P3 内部顺序：**`MailboxPicker` 紧跟 `FolderTree`**，因为侧栏只显示当前邮箱，没有 Picker 就无法切换邮箱，两者必须同一批上线（在此之前保留旧 `account/index.vue` 作为过渡入口）。
 
@@ -2006,13 +2021,15 @@ v1.2 变化：`⌘⇧E` 的语义明确为"打开 `MailboxPicker` 并聚焦其�
 
 ## 附录 C. 顺带发现的后端问题（**按你的要求：UI 全部完成后再动**）
 
-> 状态：**冻结**。你的指示是"彻底完成以上所有内容后再做修改"，因此本次与整个 P0–P6 期间都不碰这三处。此处仅作记录，避免遗忘；等 UI 收尾后重新立项。
+> 状态：**冻结**。你的指示是"彻底完成以上所有内容后再做修改"，因此本次与整个 P0–P6 期间都不碰这几处后端问题（第 4、5 条为 P4 验收时补记）。此处仅作记录，避免遗忘；等 UI 收尾后重新立项。
 
 1. `mail-worker/src/service/public-service.js:138-142` — `addUser` 用字符串拼接构造 `INSERT` SQL，`email` / `roleName` 直接来自请求体，存在 SQL 注入面。建议改为 Drizzle 参数化批量插入。
 2. 同文件 `genToken`（`:163-172`）— 全局单一 UUID 写入 KV，无过期、无作用域、无吊销记录；新 API Key 体系上线后应将其标记弃用并加过期。
 3. `mail-vue/src/views/email/index.vue:77-131` — `while(true)` 无退出条件的长轮询，路由离开时靠 `continue` 空转而非停止定时器；建议改为 `watch` 路由 + `AbortController`。
    - 注意：第 3 条是**前端**代码，且 P3 会整体重写 `views/email/`，所以它会在 P3 自然消失，不需要单独立项——冻结只针对第 1、2 条后端修复。
    - **v1.2 提醒**：增量 6 的 `searchByKeyword()` 必须用 Drizzle 的 `like()` 参数化写法，绝不能因为"只是个搜索"而拼字符串，否则等于在冻结第 1 条的同期又新造一个同类问题。这条已写进 §10.5 增量 6 与工程约束。
+4. （P4 验收时发现，2026-10-10）`mail-worker/src/service/user-service.js:140` — `list()` 用 `select({...user, …})`，`/user/list` 的响应里每一行都带着 `password`（哈希）与 `salt`，管理端浏览器里直接可见。建议改成显式列清单，去掉这两列。
+5. （同上）`/user/delete` → `userService.physicsDelete()` 不拦 `type=0`：带 `user:delete` 的人传站长的 `userId` 就能把站长账号连同邮箱、邮件一起物理删掉。前端已在 P4 补回「超级管理员不可勾选」（`DataTable` 的 `rowSelectable`），但那只是 UI 层，后端仍应拒绝。
 
 ---
 

@@ -38,6 +38,9 @@ export const USER_STATUS = {ALL: -1, ACTIVE: 0, BANNED: 1, DELETED: -2}
 
 const PARAMS_KEY = 'user-params'
 
+/** 能不能被勾进批量选择：type=0 是超级管理员 */
+export const isSelectableUser = (user) => user?.type !== 0
+
 export function useUserAdmin() {
 
     const {t} = useI18n()
@@ -78,7 +81,9 @@ export function useUserAdmin() {
         localStorage.setItem(PARAMS_KEY, JSON.stringify(params))
     }, {deep: true})
 
-    const selection = useSelection(rows, {idKey: 'userId'})
+    // 超级管理员不进批量选择（旧版 `el-table` 的 `:selectable`）。后端 `/user/delete` 不拦 type=0，
+    // 全选 + 批量删除会把站长账号连同邮件一起物理删掉，所以这一条只能在这里守住
+    const selection = useSelection(() => rows.value.filter(isSelectableUser), {idKey: 'userId'})
 
     async function getList({keepSelection = false} = {}) {
         loading.value = true

@@ -4,7 +4,7 @@
       <Checkbox
           :model-value="isIndeterminate ? 'indeterminate' : checkAll"
           :disabled="!emailList.length || loading"
-          :aria-label="t('shell.selectAll')"
+          :aria-label="t('mail.selectAll')"
           @update:model-value="handleCheckAllChange"
       />
       <div class="header-left" :style="'padding-left:' + actionLeft">
@@ -51,7 +51,7 @@
                 >
                   <Checkbox :class="props.type === 'all-email' ? 'all-email-checkbox' : 'checkbox'"
                             :model-value="item.checked"
-                            :aria-label="t('shell.selectOne')"
+                            :aria-label="t('mail.selectOne')"
                             @update:model-value="item.checked = $event"
                             @click.stop/>
                   <div @click.stop="starChange(item)" class="pc-star" v-if="showStar">
@@ -216,6 +216,7 @@ import {sleep} from "@/utils/time-utils.js"
 import {fromNow} from "@/utils/day.js";
 import {useI18n} from "vue-i18n";
 import {EmailUnreadEnum} from "@/enums/email-enum.js";
+import {statusIconMap} from "@/composables/useMailList.js";
 import { UseVirtualList } from '@vueuse/components'
 import { useScroll } from '@vueuse/core'
 

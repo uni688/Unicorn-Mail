@@ -34,7 +34,7 @@ import {EmptyState, ErrorState} from '@/components/composite'
 import {hasPerm} from '@/perm/perm.js'
 import {useSettingStore} from '@/store/setting.js'
 import {useUserStore} from '@/store/user.js'
-import {USER_STATUS, useUserAdmin} from '@/composables/useUserAdmin.js'
+import {USER_STATUS, isSelectableUser, useUserAdmin} from '@/composables/useUserAdmin.js'
 
 defineOptions({name: 'user'})
 
@@ -44,13 +44,13 @@ const userStore = useUserStore()
 
 const admin = useUserAdmin()
 const {
-    rows, total, loading, errorDetail, params, selection, getList,
+    rows, total, loading, error, errorDetail, params, selection, getList,
     roleOptions, roleName, sort, setSort, search, setPage, setStatus, refresh,
     countMode, countOf, toggleCountMode,
     addForm, addLoading, domainOptions, resetAddForm, submitAdd,
     userForm, formLoading, openForm, resetUserForm, submitPwd, submitType,
     statusActionLabel, statusActionLongLabel, toggleStatus, restore, removeUsers, resetSendCount,
-    accountRows, accountLoading, accountErrorDetail, accountParams,
+    accountRows, accountLoading, accountError, accountErrorDetail, accountParams,
     openAccountList, setAccountPage, removeAccount,
     sendCountText, sendTypeText, formatTime, canManage,
 } = admin
@@ -60,7 +60,7 @@ const canDelete = computed(() => hasPerm('user:delete'))
 /* ------------------------------------------------------------------ 列定义 */
 
 const statusOptions = computed(() => [
-    {label: t('allStatus'), value: USER_STATUS.ALL},
+    {label: t('developer.allStatus'), value: USER_STATUS.ALL},
     {label: t('active'), value: USER_STATUS.ACTIVE},
     {label: t('banned'), value: USER_STATUS.BANNED},
     {label: t('deleted'), value: USER_STATUS.DELETED},
@@ -83,9 +83,6 @@ const columns = computed(() => [
     {key: 'type', label: t('perm'), width: '130px', truncate: true},
     {key: 'actions', label: t('adminTable.actions'), width: '68px', align: 'end', cardHidden: true},
 ])
-
-/** 选择列：超级管理员不能被批量删（和旧版 `:selectable` 一致） */
-const selectableRow = (row) => row.type !== 0
 
 /* -------------------------------------------------------------- 弹窗开合 */
 
@@ -274,10 +271,11 @@ getList()
         :columns="columns"
         :rows="rows"
         row-key="userId"
-        :aria-label="t('userManage')"
+        :aria-label="t('allUsers')"
         :loading="loading"
-        :error="errorDetail"
-        :selectable="canDelete && selectableRow"
+        :error="errorDetail || Boolean(error)"
+        :selectable="canDelete"
+        :row-selectable="isSelectableUser"
         :selection="selection"
         :sort="sort"
         :page="params.num"
@@ -523,7 +521,7 @@ getList()
         row-key="accountId"
         :aria-label="t('userEmail')"
         :loading="accountLoading"
-        :error="accountErrorDetail"
+        :error="accountErrorDetail || Boolean(accountError)"
         :skeleton-rows="3"
         :page="accountParams.num"
         :page-size="accountParams.size"
@@ -566,7 +564,7 @@ getList()
           <dd class="flex items-center gap-2">
             <Avatar :src="details.avatar" :name="details.username" size="sm" />
             <span class="truncate text-fg">{{ details.username }}</span>
-            <Badge tone="success" appearance="subtle">{{ t('trustLevel') }} {{ details.trustLevel }}</Badge>
+            <Badge tone="success" appearance="subtle">{{ t('adminTable.trustLevel') }} {{ details.trustLevel }}</Badge>
           </dd>
         </template>
 

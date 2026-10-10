@@ -53,7 +53,12 @@ const props = defineProps({
 
     /* ---- 四态（§7.8）：显式 state 优先，否则由 loading / error / rows 推导 ---- */
     loading: {type: Boolean, default: false},
-    /** 真值即错误态；字符串会作为 detail 传给 `#error` 插槽 */
+    /**
+     * 真值即错误态；字符串会作为 detail 传给 `#error` 插槽。
+     * 注意 Boolean 排在 String 前面：Vue 会把**空字符串**强转成 `true`。所以别直接传
+     * `errorDetail`（没出错时它就是 `''`，整张表会卡在错误态），要写成
+     * `:error="errorDetail || Boolean(error)"`。
+     */
     error: {type: [Boolean, String, Object], default: false},
     /** @type {''|'loading'|'empty'|'error'|'data'} 测试与 `/_ds` 用来钉死某一态 */
     state: {type: String, default: ''},
@@ -63,6 +68,12 @@ const props = defineProps({
     selectable: {type: Boolean, default: false},
     /** `useSelection()` 的返回值；selectable 为真时必给 */
     selection: {type: Object, default: null},
+    /**
+     * `(row) => boolean`：哪些行能勾（`el-table` 的 `:selectable` 的等价物）。
+     * 不能勾的行复选框置灰、Space 无效、表头全选也不会把它带进来。
+     * 表头三态要准，`useSelection()` 的数据源也得是同一批可勾的行。
+     */
+    rowSelectable: {type: Function, default: null},
 
     /* ---- 排序：服务端优先，`sortable` 的列才画控件 ---- */
     /** @type {{key: string, order: 'asc'|'desc'}|null} v-model:sort */
@@ -163,11 +174,20 @@ const headerChecked = computed(() => (
 ))
 
 const isSelected = row => Boolean(props.selection?.isSelected(keyOf(row)))
+const canSelect = row => !props.rowSelectable || Boolean(props.rowSelectable(row))
 
 function onRowCheck(row, event) {
+    if (!canSelect(row)) return
     const id = keyOf(row)
     if (event?.shiftKey) props.selection.selectRange(id)
     else props.selection.toggle(id)
+    // Shift 连选会把夹在中间的不可勾行一起带进来，选完再摘掉
+    if (props.rowSelectable) props.rows.forEach(r => !canSelect(r) && props.selection.deselect(keyOf(r)))
+}
+
+function onToggleAll() {
+    props.selection.toggleAll()
+    if (props.rowSelectable) props.rows.forEach(r => !canSelect(r) && props.selection.deselect(keyOf(r)))
 }
 
 /* -------------------------------------------- 键盘导航（§6.2 ↑↓ Space Enter） */
@@ -287,7 +307,7 @@ const showPagination = computed(() => props.total > 0 && props.pageSize > 0 && p
                 size="sm"
                 :model-value="headerChecked"
                 :aria-label="t('selectAll')"
-                @update:model-value="selection.toggleAll()"
+                @update:model-value="onToggleAll"
               />
             </th>
             <th
@@ -385,6 +405,7 @@ const showPagination = computed(() => props.total > 0 && props.pageSize > 0 && p
                 <Checkbox
                   size="sm"
                   :model-value="isSelected(row)"
+                  :disabled="!canSelect(row)"
                   :aria-label="t('selectRow')"
                   @click="onRowCheck(row, $event)"
                 />
@@ -439,6 +460,7 @@ const showPagination = computed(() => props.total > 0 && props.pageSize > 0 && p
             size="sm"
             class="pt-1"
             :model-value="isSelected(row)"
+            :disabled="!canSelect(row)"
             :aria-label="t('selectRow')"
             @click.stop="onRowCheck(row, $event)"
           />
