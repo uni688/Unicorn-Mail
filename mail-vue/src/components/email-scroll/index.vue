@@ -897,12 +897,18 @@ function loadData() {
       flex-direction: column;
     }
 
+    /*
+     * 图标 + 文字一行，用 flex 对齐。原来是「行内 svg + 文字 `bottom: 5px` 往上顶」：
+     * Tailwind v4 的 preflight 把 svg 设成 `display: block` 之后，图标独占一行，文字被挤到
+     * 下一行再往上顶 5px，和图标叠在一起，行高也撑破了虚拟列表给的 132px。
+     * 省略号挂在文字 span 上 —— flex 容器自己的 text-overflow 不生效。
+     */
     .user, .account {
-      overflow: hidden;
-      white-space: nowrap;
-      text-overflow: ellipsis;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      line-height: 20px;
       transition: all 300ms;
-      line-height: 12px;
       max-width: 300px;
       min-width: 0;
 
@@ -911,13 +917,15 @@ function loadData() {
       }
 
       span:first-child {
-        position: relative;
+        display: flex;
+        flex-shrink: 0;
       }
 
       span:last-child {
-        margin-left: 5px;
-        position: relative;
-        bottom: 5px;
+        min-width: 0;
+        overflow: hidden;
+        white-space: nowrap;
+        text-overflow: ellipsis;
       }
     }
   }
