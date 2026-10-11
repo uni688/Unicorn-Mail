@@ -61,6 +61,22 @@ describe('EmailInput', () => {
         expect(wrapper.emitted('enter')).toHaveLength(1)
     })
 
+    /**
+     * P4 收尾时用户报的「域名选择器没法正常用」：上限原来是 `max-w-[45%]`，手机上登录卡片
+     * 内宽约 234px，域名只剩 105px，`@example.com / @example2.com / @example3.com` 全被截成
+     * `@exa…`，选了哪个看不出来。现在上限按「整行减掉前缀框的最小宽度」算。
+     * jsdom 没有布局，量不了像素，所以钉的是这条宽度规则本身（像素在真浏览器里量过：
+     * 360px 宽的手机上 `@example3.com` 完整显示）。
+     */
+    it('域名按内容宽度显示，只给前缀框留出最小宽度，不再按 45% 封顶', () => {
+        const wrapper = mountInput()
+        const trigger = wrapper.get('button')
+        expect(trigger.classes()).not.toContain('max-w-[45%]')
+        expect(trigger.classes()).toContain('max-w-[calc(100%_-_5rem)]')
+        // 前缀框的最小宽度就是上面那 5rem，两边对得上才不会互相挤
+        expect(wrapper.get('input').element.closest('.min-w-20')).not.toBeNull()
+    })
+
     it('站长隐藏域名时后缀选择器整块不渲染', () => {
         const wrapper = mountInput({hideDomain: true})
         expect(wrapper.find('input').exists()).toBe(true)

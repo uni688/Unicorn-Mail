@@ -60,10 +60,16 @@ defineExpose({focus: () => inputRef.value?.focus()})
       :placeholder="placeholder"
       :invalid="invalid"
       :disabled="disabled"
-      :class="hideDomain ? undefined : '[&_input]:rounded-r-none'"
+      :class="hideDomain ? undefined : 'min-w-20 flex-1 [&_input]:rounded-r-none'"
       @update:model-value="emit('update:modelValue', $event)"
       @enter="emit('enter', $event)"
     />
+    <!--
+      域名按内容宽度显示，上限 = 整行宽度减掉前缀框的最小宽度（min-w-20）。
+      原来上限是 max-w-[45%]：手机上登录卡片内宽约 234px，45% 只有 105px，
+      「@example.com / @example2.com / @example3.com」全被截成「@exa…」，选了哪个根本看不出来。
+      真的超长的域名仍会截断，但展开下拉能看到全名。
+    -->
     <Select
       v-if="!hideDomain"
       :model-value="suffix"
@@ -72,7 +78,7 @@ defineExpose({focus: () => inputRef.value?.focus()})
       :aria-label="domainLabel"
       :invalid="invalid"
       :disabled="disabled"
-      class="-ml-px w-auto max-w-[45%] shrink-0 rounded-l-none"
+      class="-ml-px w-auto max-w-[calc(100%_-_5rem)] shrink-0 rounded-l-none"
       @update:model-value="emit('update:suffix', $event)"
     />
   </div>
